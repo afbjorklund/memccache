@@ -198,6 +198,13 @@ void memccached_free(void *blob);
 int memccached_release(void);
 
 /* ------------------------------------------------------------------------- */
+/* couchbase.c */
+int cc_couchbase_init(char *conf);
+int cc_couchbase_set(const char *key, const char *type, const char* data, size_t len);
+int cc_couchbase_get(const char *key, const char *type, char **data, size_t *len);
+int cc_couchbase_release(void);
+
+/* ------------------------------------------------------------------------- */
 /* stats.c */
 
 void stats_update(enum stats stat);

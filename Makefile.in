@@ -29,6 +29,7 @@ non_3pp_sources = \
     compopt.c \
     conf.c \
     counters.c \
+    couchbase.c \
     execute.c \
     exitfn.c \
     hash.c \

@@ -309,6 +309,7 @@ conf_create(void)
 	conf->compiler_check = x_strdup("mtime");
 	conf->compression = false;
 	conf->compression_level = 6;
+	conf->couchbase_conf = x_strdup("");
 	conf->cpp_extension = x_strdup("");
 	conf->direct_mode = true;
 	conf->disable = false;
@@ -553,6 +554,9 @@ conf_print_items(struct conf *conf,
 	reformat(&s, "compression_level = %u", conf->compression_level);
 	printer(s, conf->item_origins[find_conf("compression_level")->number],
 	        context);
+
+	reformat(&s, "couchbase_conf = %s", conf->couchbase_conf);
+	printer(s, conf->item_origins[find_conf("couchbase_conf")->number], context);
 
 	reformat(&s, "cpp_extension = %s", conf->cpp_extension);
 	printer(s, conf->item_origins[find_conf("cpp_extension")->number], context);

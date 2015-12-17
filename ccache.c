@@ -1022,6 +1022,10 @@ to_fscache(struct args *args)
 	char *data_obj, *data_stderr, *data_dia, *data_dep;
 	size_t size_obj, size_stderr, size_dia, size_dep;
 #endif
+#ifdef HAVE_LIBCOUCHBASE
+	char *data;
+	size_t size;
+#endif
 	struct stat st;
 	int status, tmp_stdout_fd, tmp_stderr_fd;
 
@@ -1313,6 +1317,27 @@ to_fscache(struct args *args)
 		free(data_stderr);
 		free(data_dia);
 		free(data_dep);
+	}
+#endif
+#ifdef HAVE_LIBCOUCHBASE
+	{
+		cc_log("Storing %s in couchbase", cached_key);
+		if (read_file(cached_obj, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "o", data, size);
+			free(data);
+		}
+		if (read_file(cached_stderr, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "stderr", data, size);
+			free(data);
+		}
+		if (output_dia && read_file(cached_dia, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "dia", data, size);
+			free(data);
+		}
+		if (generating_dependencies && read_file(cached_dep, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "d", data, size);
+			free(data);
+		}
 	}
 #endif
 	/* Everything OK. */
@@ -2108,6 +2133,11 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 	char *data_obj, *data_stderr, *data_dia, *data_dep;
 	size_t size_obj, size_stderr, size_dia, size_dep;
 #endif
+#if HAVE_LIBCOUCHBASE
+	int err;
+	char *data;
+	size_t size;
+#endif
 
 	/* the user might be disabling cache hits */
 	if (conf->recache) {
@@ -2141,6 +2171,23 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 			}
 			memccached_free(cache);
 		} else
+#endif
+#if HAVE_LIBCOUCHBASE
+		{
+			cc_log("Getting %s from couchbase", cached_key);
+			if (!(err = cc_couchbase_get(cached_key, "o", &data, &size))) {
+				write_file(data, cached_obj, size);
+			}
+			if (!(err = cc_couchbase_get(cached_key, "stderr", &data, &size))) {
+				write_file(data, cached_stderr, size);
+			}
+			if (!(err = cc_couchbase_get(cached_key, "dia", &data, &size))) {
+				write_file(data, cached_dia, size);
+			}
+			if (!(err = cc_couchbase_get(cached_key, "d", &data, &size))) {
+				write_file(data, cached_dep, size);
+			}
+		}
 #endif
 		return;
 	}
@@ -3414,6 +3461,11 @@ initialize(void)
 		to_cache = to_memcached;
 	}
 #endif
+#ifdef HAVE_LIBCOUCHBASE
+	if (strlen(conf->couchbase_conf) > 0) {
+		cc_couchbase_init(conf->couchbase_conf);
+	}
+#endif
 	exitfn_init();
 	exitfn_add_nullary(stats_flush);
 	exitfn_add_nullary(clean_up_pending_tmp_files);
@@ -3477,6 +3529,9 @@ cc_reset(void)
 
 #ifdef HAVE_LIBMEMCACHED
 	memccached_release();
+#endif
+#ifdef HAVE_LIBCOUCHBASE
+	cc_couchbase_release();
 #endif
 
 	conf = conf_create();

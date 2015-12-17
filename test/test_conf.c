@@ -20,7 +20,7 @@
 #include "test/framework.h"
 #include "test/util.h"
 
-#define N_CONFIG_ITEMS 32
+#define N_CONFIG_ITEMS 33
 static struct {
 	char *descr;
 	const char *origin;
@@ -104,6 +104,7 @@ TEST(conf_read_valid_config)
 	  "compiler_check = none\n"
 	  "compression=true\n"
 	  "compression_level= 2\n"
+	  "couchbase_conf= \n"
 	  "cpp_extension = .foo\n"
 	  "direct_mode = false\n"
 	  "disable = true\n"
@@ -362,6 +363,7 @@ TEST(conf_print_items)
 		"cc", /* compiler_check */
 		true, /* compression */
 		8, /* compression_level */
+		"cb", /* couchbase_conf */
 		"ce", /* cpp_extension */
 		false, /* direct_mode */
 		true, /* disable */
@@ -407,6 +409,7 @@ TEST(conf_print_items)
 	CHECK_STR_EQ("compiler_check = cc", received_conf_items[n++].descr);
 	CHECK_STR_EQ("compression = true", received_conf_items[n++].descr);
 	CHECK_STR_EQ("compression_level = 8", received_conf_items[n++].descr);
+	CHECK_STR_EQ("couchbase_conf = cb", received_conf_items[n++].descr);
 	CHECK_STR_EQ("cpp_extension = ce", received_conf_items[n++].descr);
 	CHECK_STR_EQ("direct_mode = false", received_conf_items[n++].descr);
 	CHECK_STR_EQ("disable = true", received_conf_items[n++].descr);

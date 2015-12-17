@@ -108,6 +108,22 @@ if test x${enable_memcached} != x; then
     ccache_memcached='CCACHE_MEMCACHED=1 '
 fi
 
+AC_ARG_ENABLE(couchbase,
+  [AS_HELP_STRING([--enable-couchbase],
+    [enable couchbase as a cache backend])])
+
+dnl enable-couchbase: Check if -lcouchbase is needed.
+if test x${enable_couchbase} != x; then
+    if test x${enable_static} != x; then
+        AC_CHECK_LIB(stdc++, __gxx_personality_v0,[])
+    fi
+    AC_CHECK_LIB(couchbase, lcb_get_version,[],[
+    echo '  WARNING: recent version libcouchbase not found'
+    echo '  please install libcouchbase>2.4 with development files'
+    exit 1
+    ])
+fi
+
 dnl Check for zlib
 AC_ARG_WITH(bundled-zlib,
   [AS_HELP_STRING([--with-bundled-zlib],
