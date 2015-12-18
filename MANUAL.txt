@@ -336,6 +336,14 @@ WRAPPERS>>.
     compiled, but that sometimes doesn't work. For example, when using the
     ``aCC'' compiler on HP-UX, set the cpp extension to *i*.
 
+*couchbase_conf* (*CCACHE_COUCHBASE_CONF*)::
+
+    The couchbase_conf option sets the libcouchbase configuration to use
+    for storing and getting cache values, if any.
+    Example configuration:
+
+    CCACHE_COUCHBASE_CONF=couchbase://localhost/default
+
 *direct_mode* (*CCACHE_DIRECT*) [boolean]::
 
     If true, the direct mode will be used. The default is true. See
