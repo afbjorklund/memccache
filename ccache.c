@@ -978,7 +978,7 @@ void update_manifest_file(void)
 {
 	struct stat st;
 	size_t old_size = 0; /* in bytes */
-#ifdef HAVE_LIBMEMCACHED
+#if defined(HAVE_LIBMEMCACHED) || defined(HAVE_LIBCOUCHBASE)
 	char *data;
 	size_t size;
 #endif
@@ -1004,6 +1004,15 @@ void update_manifest_file(void)
 				cc_log("Storing %s in memcached", manifest_name);
 				memccached_raw_set(manifest_name, data, size);
 				free(data);
+			}
+#endif
+#if HAVE_LIBCOUCHBASE
+			if (conf->couchbase_conf) {
+				if (read_file(manifest_path, st.st_size, &data, &size)) {
+					cc_log("Storing %s in couchbase", manifest_name);
+					cc_couchbase_set(manifest_name, "manifest", data, size);
+					free(data);
+				}
 			}
 #endif
 		}
@@ -1880,9 +1889,12 @@ calculate_object_hash(struct args *args, struct mdfour *hash, int direct_mode)
 	struct stat st;
 	struct file_hash *object_hash = NULL;
 	char *p;
-#if HAVE_LIBMEMCACHED
-	char *data;
+#if defined(HAVE_LIBMEMCACHED) || defined(HAVE_LIBCOUCHBASE)
+	char *data = NULL;
 	size_t size;
+#endif
+#ifdef HAVE_LIBMEMCACHED
+	void *cache = NULL;
 #endif
 
 	if (direct_mode) {
@@ -2098,6 +2110,15 @@ calculate_object_hash(struct args *args, struct mdfour *hash, int direct_mode)
 				write_file(data, manifest_path, size);
 				stats_update_size(size, 1);
 				free(cache);
+			} else
+#endif
+#if HAVE_LIBCOUCHBASE
+			if (conf->couchbase_conf) {
+				cc_log("Getting %s from couchbase", manifest_name);
+				cc_couchbase_get(manifest_name, "manifest", &data, &size);
+			}
+			if (data) {
+				write_file(data, manifest_path, size);
 			} else
 #endif
 			return NULL;
