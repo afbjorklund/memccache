@@ -1007,7 +1007,7 @@ void update_manifest_file(void)
 			}
 #endif
 #if HAVE_LIBCOUCHBASE
-			if (conf->couchbase_conf) {
+			if (strlen(conf->couchbase_conf) > 0) {
 				if (read_file(manifest_path, st.st_size, &data, &size)) {
 					cc_log("Storing %s in couchbase", manifest_name);
 					cc_couchbase_set(manifest_name, "manifest", data, size);
@@ -1329,7 +1329,7 @@ to_fscache(struct args *args)
 	}
 #endif
 #ifdef HAVE_LIBCOUCHBASE
-	{
+	if (strlen(conf->couchbase_conf) > 0) {
 		cc_log("Storing %s in couchbase", cached_key);
 		if (read_file(cached_obj, 0, &data, &size)) {
 			cc_couchbase_set(cached_key, "o", data, size);
@@ -2113,7 +2113,7 @@ calculate_object_hash(struct args *args, struct mdfour *hash, int direct_mode)
 			} else
 #endif
 #if HAVE_LIBCOUCHBASE
-			if (conf->couchbase_conf) {
+			if (strlen(conf->couchbase_conf) > 0) {
 				cc_log("Getting %s from couchbase", manifest_name);
 				cc_couchbase_get(manifest_name, "manifest", &data, &size);
 			}
@@ -2194,7 +2194,7 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 		} else
 #endif
 #if HAVE_LIBCOUCHBASE
-		{
+		if (strlen(conf->couchbase_conf) > 0) {
 			cc_log("Getting %s from couchbase", cached_key);
 			if (!(err = cc_couchbase_get(cached_key, "o", &data, &size))) {
 				write_file(data, cached_obj, size);
