@@ -2152,7 +2152,6 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 	size_t size_obj, size_stderr, size_dia, size_dep;
 #endif
 #if HAVE_LIBCOUCHBASE
-	int err;
 	char *data;
 	size_t size;
 #endif
@@ -2193,16 +2192,16 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 #if HAVE_LIBCOUCHBASE
 		if (strlen(conf->couchbase_conf) > 0) {
 			cc_log("Getting %s from couchbase", cached_key);
-			if (!(err = cc_couchbase_get(cached_key, "o", &data, &size))) {
+			if (!cc_couchbase_get(cached_key, "o", &data, &size)) {
 				write_file(data, cached_obj, size);
 			}
-			if (!(err = cc_couchbase_get(cached_key, "stderr", &data, &size))) {
+			if (!cc_couchbase_get(cached_key, "stderr", &data, &size)) {
 				write_file(data, cached_stderr, size);
 			}
-			if (!(err = cc_couchbase_get(cached_key, "dia", &data, &size))) {
+			if (!cc_couchbase_get(cached_key, "dia", &data, &size)) {
 				write_file(data, cached_dia, size);
 			}
-			if (!(err = cc_couchbase_get(cached_key, "d", &data, &size))) {
+			if (!cc_couchbase_get(cached_key, "d", &data, &size)) {
 				write_file(data, cached_dep, size);
 			}
 		}
