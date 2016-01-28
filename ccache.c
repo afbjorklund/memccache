@@ -1893,9 +1893,6 @@ calculate_object_hash(struct args *args, struct mdfour *hash, int direct_mode)
 	char *data = NULL;
 	size_t size;
 #endif
-#ifdef HAVE_LIBMEMCACHED
-	void *cache = NULL;
-#endif
 
 	if (direct_mode) {
 		hash_delimiter(hash, "manifest version");
