@@ -103,7 +103,7 @@ perf: ccache$(EXEEXT)
 .PHONY: test
 test: ccache$(EXEEXT) test/main$(EXEEXT)
 	test/main$(EXEEXT)
-	CC='$(CC)' @ccache_memcached@$(srcdir)/test.sh
+	CC='$(CC)' @ccache_memcached@@ccache_couchbase@$(srcdir)/test.sh
 
 .PHONY: quicktest
 quicktest: test/main$(EXEEXT)

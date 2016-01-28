@@ -284,6 +284,9 @@ base_tests() {
     if [ ! -z $CCACHE_MEMCACHED_CONF ]; then
         return
     fi
+    if [ ! -z $CCACHE_COUCHBASE_CONF ]; then
+        return
+    fi
 
     # strictly speaking should be 4 - RECACHE causes a double counting!
     $CCACHE_NOFILES checkstat 'files in cache' 4
@@ -789,6 +792,14 @@ memcached_socket_suite() {
     kill $memcached_pid
     rm /tmp/memcached.$$
     unset CCACHE_MEMCACHED_CONF
+}
+
+couchbase_suite() {
+    CCACHE_COMPILE="$CCACHE $COMPILER"
+    # need to start couchbase-server first, for this to work
+    export CCACHE_COUCHBASE_CONF=couchbase://localhost/default
+    base_tests
+    unset CCACHE_COUCHBASE_CONF
 }
 
 direct_suite() {
@@ -2611,6 +2622,11 @@ if [ ! -z $CCACHE_MEMCACHED ]; then
 memcached
 memcached_only
 memcached_socket !win32
+"
+fi
+if [ ! -z $CCACHE_COUCHBASE ]; then
+    all_suites="$all_suites
+couchbase
 "
 fi
 

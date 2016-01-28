@@ -17,6 +17,7 @@ case $host in
 esac
 
 AC_SUBST(ccache_memcached)
+AC_SUBST(ccache_couchbase)
 AC_SUBST(extra_libs)
 AC_SUBST(include_dev_mk)
 AC_SUBST(test_suites)
@@ -122,6 +123,7 @@ if test x${enable_couchbase} != x; then
     echo '  please install libcouchbase>2.4 with development files'
     exit 1
     ])
+    ccache_couchbase='CCACHE_COUCHBASE=1 '
 fi
 
 dnl Check for zlib
