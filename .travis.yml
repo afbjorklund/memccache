@@ -3,7 +3,10 @@ language: c
 addons:
     apt:
         packages:
+            - elfutils
             - zlib1g-dev
+            - mingw32
+            - mingw32-binutils
 
 os:
     - linux
@@ -16,17 +19,18 @@ compiler:
 matrix:
     include:
         - os: linux
+          compiler: i586-mingw32msvc-gcc
+          env: HOST="--host=i586-mingw32msvc" TEST="test/main.exe"
+        - os: linux
           compiler: clang
           env: CFLAGS="-fsanitize=address -g" ASAN_OPTIONS="detect_leaks=0"
+
     exclude:
         - os: osx
           compiler: gcc
 
 script:
     - ./autogen.sh
-    - ./configure
+    - ./configure $HOST
     - make
-    - make quicktest
-    - if [ "$CC" = "gcc" ]; then
-          ./test.sh;
-      fi
+    - make ${TEST:-test}

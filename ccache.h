@@ -187,13 +187,13 @@ int memccached_init(char *conf);
 int memccached_raw_set(const char *key, const char* data, size_t len);
 int memccached_set(
 	const char *key,
-	const char *out, const char *stderr, const char *dia, const char *dep,
-	size_t out_len, size_t stderr_len, size_t dia_len, size_t dep_len);
+	const char *out, const char *err, const char *dia, const char *dep,
+	size_t out_len, size_t err_len, size_t dia_len, size_t dep_len);
 void *memccached_raw_get(const char *key, char **data, size_t *len);
 void* memccached_get(
 	const char *key,
-	char **out, char **stderr, char **dia, char **dep,
-	size_t *out_len, size_t *stderr_len, size_t *dia_len, size_t *dep_len);
+	char **out, char **err, char **dia, char **dep,
+	size_t *out_len, size_t *err_len, size_t *dia_len, size_t *dep_len);
 void memccached_free(void *blob);
 int memccached_release(void);
 
@@ -297,7 +297,7 @@ void add_exe_ext_if_no_to_fullpath(char *full_path_win_ext, size_t max_size,
 #    define link(src,dst) (CreateHardLink(dst,src,NULL) ? 0 : -1)
 #    define lstat(a,b) stat(a,b)
 #    define execv(a,b) win32execute(a,b,0,-1,-1)
-#    define execute(a,b,c) win32execute(*(a),a,1,b,c)
+#    define execute(a,b,c,d) win32execute(*(a),a,1,b,c)
 #    define DIR_DELIM_CH '/'
 #    define PATH_DELIM ";"
 #    define F_RDLCK 0

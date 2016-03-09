@@ -189,11 +189,17 @@ static char **ignore_headers;
 /* Size of headers to ignore list */
 static size_t ignore_headers_len;
 
+/* is gcc being asked to output debug info? */
+static bool generating_debuginfo;
+
 /* is gcc being asked to output dependencies? */
 static bool generating_dependencies;
 
 /* is gcc being asked to output coverage? */
 static bool generating_coverage;
+
+/* relocating debuginfo, in the format old=new */
+static char *debug_prefix_map = NULL;
 
 /* is gcc being asked to output coverage data (.gcda) at runtime? */
 static bool profile_arcs;
@@ -251,11 +257,13 @@ struct pending_tmp_file {
 /* Temporary files to remove at program exit. */
 static struct pending_tmp_file *pending_tmp_files = NULL;
 
+#ifndef _WIN32
 static sigset_t fatal_signal_set;
 
 /* PID of currently executing compiler that we have started, if any. 0 means no
  * ongoing compilation. */
 static pid_t compiler_pid = 0;
+#endif
 
 /*
  * This is a string that identifies the current "version" of the hash sum
@@ -347,15 +355,19 @@ temp_dir()
 void
 block_signals(void)
 {
+#ifndef _WIN32
 	sigprocmask(SIG_BLOCK, &fatal_signal_set, NULL);
+#endif
 }
 
 void
 unblock_signals(void)
 {
+#ifndef _WIN32
 	sigset_t empty;
 	sigemptyset(&empty);
 	sigprocmask(SIG_SETMASK, &empty, NULL);
+#endif
 }
 
 static void
@@ -392,6 +404,7 @@ clean_up_pending_tmp_files(void)
 	unblock_signals();
 }
 
+#ifndef _WIN32
 static void
 signal_handler(int signum)
 {
@@ -452,6 +465,7 @@ set_up_signal_handlers(void)
 	register_signal_handler(SIGQUIT);
 #endif
 }
+#endif /* _WIN32 */
 
 static void
 clean_up_internal_tempdir(void)
@@ -548,6 +562,8 @@ remember_include_file(char *path, struct mdfour *cpp_hash, bool system)
 	size_t size;
 	bool is_pch;
 	size_t path_len = strlen(path);
+	char *canonical;
+	size_t canonical_len;
 	char *ignore;
 	size_t ignore_len;
 	size_t i;
@@ -593,16 +609,24 @@ remember_include_file(char *path, struct mdfour *cpp_hash, bool system)
 		goto failure;
 	}
 
+	/* canonicalize path for comparison, clang uses ./header.h */
+	canonical = path;
+	canonical_len = path_len;
+	if (canonical[0] == '.' && canonical[1] == '/') {
+		canonical += 2;
+		canonical_len -= 2;
+	}
+
 	for (i = 0; i < ignore_headers_len; i++) {
 		ignore = ignore_headers[i];
 		ignore_len = strlen(ignore);
-		if (ignore_len > path_len) {
+		if (ignore_len > canonical_len) {
 			continue;
 		}
-		if (strncmp(path, ignore, ignore_len) == 0
+		if (strncmp(canonical, ignore, ignore_len) == 0
 		    && (ignore[ignore_len-1] == DIR_DELIM_CH
-		        || path[ignore_len] == DIR_DELIM_CH
-		        || path[ignore_len] == '\0')) {
+		        || canonical[ignore_len] == DIR_DELIM_CH
+		        || canonical[ignore_len] == '\0')) {
 			goto ignore;
 		}
 	}
@@ -691,6 +715,11 @@ make_relative_path(char *path)
 		return path;
 	}
 
+#ifdef _WIN32
+	if (path[0] == '/')
+		path++;  /* skip leading slash */
+#endif
+
 	/* x_realpath only works for existing paths, so if path doesn't exist, try
 	 * dirname(path) and assemble the path afterwards. We only bother to try
 	 * canonicalizing one of these two paths since a compiler path argument
@@ -704,6 +733,7 @@ make_relative_path(char *path)
 			free(dir);
 			return path;
 		}
+		free(dir);
 		path_suffix = basename(path);
 		p = path;
 		path = dirname(path);
@@ -878,18 +908,20 @@ put_file_in_cache(const char *source, const char *dest)
 	if (do_link) {
 		x_unlink(dest);
 		ret = link(source, dest);
-	} else {
+		if (ret != 0) {
+			cc_log("Failed to link %s to %s: %s", source, dest, strerror(errno));
+			cc_log("Falling back to copying");
+			do_link = false;
+		}
+	}
+	if (!do_link) {
 		ret = copy_file(
 		  source, dest, conf->compression ? conf->compression_level : 0);
-	}
-	if (ret != 0) {
-		cc_log("Failed to %s %s to %s: %s",
-		       do_link ? "link" : "copy",
-		       source,
-		       dest,
-		       strerror(errno));
-		stats_update(STATS_ERROR);
-		failed();
+		if (ret != 0) {
+			cc_log("Failed to copy %s to %s: %s", source, dest, strerror(errno));
+			stats_update(STATS_ERROR);
+			failed();
+		}
 	}
 	cc_log("Stored in cache: %s -> %s", source, dest);
 	if (x_stat(dest, &st) != 0) {
@@ -936,7 +968,7 @@ get_file_from_cache(const char *source, const char *dest)
 	}
 
 	if (ret == -1) {
-		if (errno == ENOENT) {
+		if (errno == ENOENT || errno == ESTALE) {
 			/* Someone removed the file just before we began copying? */
 			cc_log("Cache file %s just disappeared from cache", source);
 			stats_update(STATS_MISSING);
@@ -1818,8 +1850,25 @@ calculate_common_hash(struct args *args, struct mdfour *hash)
 	free(p);
 
 	/* Possibly hash the current working directory. */
-	if (conf->hash_dir) {
+	if (generating_debuginfo && conf->hash_dir) {
 		char *cwd = gnu_getcwd();
+		if (debug_prefix_map) {
+			char *map = debug_prefix_map;
+			char *sep = strchr(map, '=');
+			if (sep) {
+				char *dir, *old, *new;
+				old = x_strndup(map, sep - map);
+				new = x_strdup(sep + 1);
+				cc_log("Relocating debuginfo cwd %s, from %s to %s", cwd, old, new);
+				if (str_startswith(cwd, old)) {
+					dir = format("%s%s", new, cwd + strlen(old));
+					free(cwd);
+					cwd = dir;
+				}
+				free(old);
+				free(new);
+			}
+		}
 		if (cwd) {
 			hash_delimiter(hash, "cwd");
 			hash_string(hash, cwd);
@@ -2691,10 +2740,16 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 			args_add(stripped_args, argv[i]);
 			continue;
 		}
+		if (str_startswith(argv[i], "-fdebug-prefix-map=")) {
+			debug_prefix_map = x_strdup(argv[i] + 19);
+			args_add(stripped_args, argv[i]);
+			continue;
+		}
 
 		/* Debugging is handled specially, so that we know if we can strip line
 		 * number info. */
 		if (str_startswith(argv[i], "-g")) {
+			generating_debuginfo = true;
 			args_add(stripped_args, argv[i]);
 			if (conf->unify && !str_eq(argv[i], "-g0")) {
 				cc_log("%s used; disabling unify mode", argv[i]);
@@ -3020,7 +3075,7 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 			continue;
 		}
 
-		/* Same as above but options with concatenated argument. */
+		/* Same as above but short options with concatenated argument. */
 		if (compopt_short(compopt_takes_path, argv[i])) {
 			char *relpath;
 			char *option;
@@ -3036,6 +3091,30 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 			free(relpath);
 			free(option);
 			continue;
+		}
+
+		/* Same as above but long options with concatenated argument beginning with
+		 * a slash. */
+		if (argv[i][0] == '-') {
+			char *slash_pos = strchr(argv[i], '/');
+			if (slash_pos) {
+				char *option = x_strndup(argv[i], slash_pos - argv[i]);
+				if (compopt_affects_cpp(option)) {
+					if (compopt_takes_concat_arg(option)) {
+						char *relpath = make_relative_path(x_strdup(slash_pos));
+						args_add(cpp_args, option);
+						args_add(cpp_args, relpath);
+						free(relpath);
+					} else {
+						args_add(cpp_args, argv[i]);
+					}
+				} else {
+					args_add(stripped_args, argv[i]);
+				}
+
+				free(option);
+				continue;
+			}
 		}
 
 		/* options that take an argument */
@@ -3505,6 +3584,7 @@ cc_reset(void)
 	free(primary_config_path); primary_config_path = NULL;
 	free(secondary_config_path); secondary_config_path = NULL;
 	free(current_working_dir); current_working_dir = NULL;
+	free(debug_prefix_map); debug_prefix_map = NULL;
 	free(profile_dir); profile_dir = NULL;
 	free(included_pch_file); included_pch_file = NULL;
 	args_free(orig_args); orig_args = NULL;
@@ -3534,6 +3614,7 @@ cc_reset(void)
 	if (included_files) {
 		hashtable_destroy(included_files, 1); included_files = NULL;
 	}
+	generating_debuginfo = false;
 	generating_dependencies = false;
 	generating_coverage = false;
 	profile_arcs = false;
@@ -3602,7 +3683,9 @@ ccache(int argc, char *argv[])
 	/* Arguments to send to the real compiler. */
 	struct args *compiler_args;
 
+#ifndef _WIN32
 	set_up_signal_handlers();
+#endif
 
 	orig_args = args_init(argc, argv);
 
