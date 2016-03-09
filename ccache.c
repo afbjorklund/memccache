@@ -1039,12 +1039,11 @@ void update_manifest_file(void)
 			}
 #endif
 #if HAVE_LIBCOUCHBASE
-			if (strlen(conf->couchbase_conf) > 0) {
-				if (read_file(manifest_path, st.st_size, &data, &size)) {
-					cc_log("Storing %s in couchbase", manifest_name);
-					cc_couchbase_set(manifest_name, "manifest", data, size);
-					free(data);
-				}
+			if (strlen(conf->couchbase_conf) > 0 &&
+			    read_file(manifest_path, st.st_size, &data, &size)) {
+				cc_log("Storing %s in couchbase", manifest_name);
+				cc_couchbase_set(manifest_name, "manifest", data, size);
+				free(data);
 			}
 #endif
 		}
@@ -2164,7 +2163,9 @@ calculate_object_hash(struct args *args, struct mdfour *hash, int direct_mode)
 				cc_couchbase_get(manifest_name, "manifest", &data, &size);
 			}
 			if (data) {
+				cc_log("Added object file hash to %s", manifest_path);
 				write_file(data, manifest_path, size);
+				stats_update_size(size, 1);
 			} else
 #endif
 			return NULL;
