@@ -1360,7 +1360,9 @@ to_fscache(struct args *args)
 	}
 #endif
 #ifdef HAVE_LIBCOUCHBASE
-	if (strlen(conf->couchbase_conf) > 0) {
+	if (strlen(conf->couchbase_conf) > 0 &&
+	    !using_split_dwarf && /* no support for the dwo files just yet */
+	    !generating_coverage) { /* coverage refers to local paths anyway */
 		cc_log("Storing %s in couchbase", cached_key);
 		if (read_file(cached_obj, 0, &data, &size)) {
 			cc_couchbase_set(cached_key, "o", data, size);
@@ -2240,7 +2242,9 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 		} else
 #endif
 #if HAVE_LIBCOUCHBASE
-		if (strlen(conf->couchbase_conf) > 0) {
+		if (strlen(conf->couchbase_conf) > 0 &&
+		    !using_split_dwarf &&
+		    !generating_coverage) {
 			cc_log("Getting %s from couchbase", cached_key);
 			if (!cc_couchbase_get(cached_key, "o", &data, &size)) {
 				write_file(data, cached_obj, size);
