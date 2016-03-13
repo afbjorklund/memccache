@@ -27,18 +27,19 @@ int cc_couchbase_init(char *conf)
 	cropts.v.v3.connstr = conf; /* "couchbase://localhost/default" */
 	lcb_error_t err;
 
-	cc_log("couchbase_init %s", conf);
-
 	err = lcb_create(&cb, &cropts);
 	if (err != LCB_SUCCESS) {
-		cc_log("Couldn't create instance!");
+		cc_log("Couldn't create instance: %s",
+		       lcb_strerror(NULL, err));
 		return err;
 	}
 
 	lcb_connect(cb);
 	lcb_wait(cb);
-	if ((err = lcb_get_bootstrap_status(cb)) != LCB_SUCCESS) {
-		cc_log("Couldn't bootstrap!");
+	err = lcb_get_bootstrap_status(cb);
+	if (err != LCB_SUCCESS) {
+		cc_log("Couldn't bootstrap: %s",
+		       lcb_strerror(NULL, err));
 		return err;
 	}
 
