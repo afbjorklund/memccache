@@ -15,7 +15,7 @@ for dirpath, dirnames, filenames in os.walk(ccache):
         stat = os.stat(os.path.join(dirpath, filename))
         filelist.append((stat.st_mtime, dirpath, filename))
 filelist.sort()
-files = blobs = objects = manifest = 0
+files = blobs = toobig = objects = manifest = 0
 for mtime, dirpath, filename in filelist:
     dirname = dirpath.replace(ccache + os.path.sep, "")
     if filename == "CACHEDIR.TAG":
@@ -28,7 +28,6 @@ for mtime, dirpath, filename in filelist:
             ext == '.dia' or
             ext == '.d' or
             ext == '.manifest'):
-            files = files + 1
             if ext == '.o':
                 objects = objects + 1
             if ext == '.manifest':
@@ -37,6 +36,11 @@ for mtime, dirpath, filename in filelist:
             val = open(os.path.join(dirpath, filename)).read() or None
             if val:
                 print "%s: %d" % (key, len(val))
-                bucket.upsert(key, val)
-                blobs = blobs + 1
-print "%d files, %d objects (%d manifest) = %d blobs" % (files, objects, manifest, blobs)
+                try:
+                    bucket.upsert(key, val)
+                    blobs = blobs + 1
+                except couchbase.exceptions.TooBigError:
+                    print "# TOO BIG! (%dM)" % (len(val) >> 20)
+                    toobig = toobig + 1
+            files = files + 1
+print "%d files, %d objects (%d manifest) = %d blobs (%d toobig)" % (files, objects, manifest, blobs, toobig)
