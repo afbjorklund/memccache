@@ -55,6 +55,8 @@ void storage_callback(lcb_t instance, const void *cookie, lcb_storage_t op,
 	(void) instance; (void) cookie; (void) op;
 	if (err == LCB_SUCCESS) {
 		cc_log("CB Stored %.*s", (int)resp->v.v0.nkey, (char *)resp->v.v0.key);
+	} else {
+		cc_log("CB Fail %s", lcb_strerror(NULL, err));
 	}
 }
 
