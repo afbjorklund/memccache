@@ -1,5 +1,5 @@
 // Copyright (C) 2002 Andrew Tridgell
-// Copyright (C) 2009-2018 Joel Rosdahl
+// Copyright (C) 2009-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -33,26 +33,33 @@
 #include <tchar.h>
 #endif
 
+// Destination for conf->log_file.
 static FILE *logfile;
-static char *logbuffer;
-static size_t logbufsize;
-static size_t logsize;
 
-#define LOGBUFSIZ 1024
+// Buffer used for logs in conf->debug mode.
+static char *debug_log_buffer;
+
+// Allocated debug_log_buffer size.
+static size_t debug_log_buffer_capacity;
+
+// The amount of log data stored in debug_log_buffer.
+static size_t debug_log_size;
+
+#define DEBUG_LOG_BUFFER_MARGIN 1024
 
 static bool
 init_log(void)
 {
 	extern struct conf *conf;
 
-	if (logbuffer || logfile) {
+	if (debug_log_buffer || logfile) {
 		return true;
 	}
 	assert(conf);
 	if (conf->debug) {
-		logbufsize = LOGBUFSIZ;
-		logbuffer = x_malloc(logbufsize);
-		logsize = 0;
+		debug_log_buffer_capacity = DEBUG_LOG_BUFFER_MARGIN;
+		debug_log_buffer = x_malloc(debug_log_buffer_capacity);
+		debug_log_size = 0;
 	}
 	if (str_eq(conf->log_file, "")) {
 		return conf->debug;
@@ -69,15 +76,15 @@ init_log(void)
 }
 
 static void
-append_log(const char *s, size_t len)
+append_to_debug_log(const char *s, size_t len)
 {
-	assert(logbuffer);
-	if (logsize + len + 1 > logbufsize) {
-		logbufsize = logbufsize + len + 1 + LOGBUFSIZ;
-		logbuffer = x_realloc(logbuffer, logbufsize);
+	assert(debug_log_buffer);
+	if (debug_log_size + len + 1 > debug_log_buffer_capacity) {
+		debug_log_buffer_capacity += len + 1 + DEBUG_LOG_BUFFER_MARGIN;
+		debug_log_buffer = x_realloc(debug_log_buffer, debug_log_buffer_capacity);
 	}
-	memcpy(logbuffer + logsize, s, len);
-	logsize += len;
+	memcpy(debug_log_buffer + debug_log_size, s, len);
+	debug_log_size += len;
 }
 
 static void
@@ -87,15 +94,15 @@ log_prefix(bool log_updated_time)
 #ifdef HAVE_GETTIMEOFDAY
 	if (log_updated_time) {
 		char timestamp[100];
-		struct tm *tm;
+		struct tm tm;
 		struct timeval tv;
 		gettimeofday(&tv, NULL);
 #ifdef __MINGW64_VERSION_MAJOR
-		tm = localtime((time_t *)&tv.tv_sec);
+		localtime_r((time_t *)&tv.tv_sec, &tm);
 #else
-		tm = localtime(&tv.tv_sec);
+		localtime_r(&tv.tv_sec, &tm);
 #endif
-		strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", tm);
+		strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", &tm);
 		snprintf(prefix, sizeof(prefix),
 		         "[%s.%06d %-5d] ", timestamp, (int)tv.tv_usec, (int)getpid());
 	}
@@ -105,8 +112,8 @@ log_prefix(bool log_updated_time)
 	if (logfile) {
 		fputs(prefix, logfile);
 	}
-	if (logbuffer) {
-		append_log(prefix, strlen(prefix));
+	if (debug_log_buffer) {
+		append_to_debug_log(prefix, strlen(prefix));
 	}
 }
 
@@ -156,11 +163,13 @@ vlog(const char *format, va_list ap, bool log_updated_time)
 			warn_log_fail();
 		}
 	}
-	if (logbuffer) {
-		char buf[1024];
-		size_t len = vsnprintf(buf, sizeof(buf), format, aq);
-		append_log(buf, len);
-		append_log("\n", 1);
+	if (debug_log_buffer) {
+		char buf[8192];
+		int len = vsnprintf(buf, sizeof(buf), format, aq);
+		if (len >= 0) {
+			append_to_debug_log(buf, MIN((size_t)len, sizeof(buf) - 1));
+			append_to_debug_log("\n", 1);
+		}
 	}
 	va_end(aq);
 }
@@ -206,21 +215,25 @@ cc_log_argv(const char *prefix, char **argv)
 			warn_log_fail();
 		}
 	}
-	if (logbuffer) {
-		append_log(prefix, strlen(prefix));
+	if (debug_log_buffer) {
+		append_to_debug_log(prefix, strlen(prefix));
 		char *s = format_command(argv);
-		append_log(s, strlen(s));
+		append_to_debug_log(s, strlen(s));
 		free(s);
 	}
 }
 
 // Copy the current log memory buffer to an output file.
 void
-cc_dump_log_buffer(const char *path)
+cc_dump_debug_log_buffer(const char *path)
 {
 	FILE *file = fopen(path, "w");
-	(void) fwrite(logbuffer, 1, logsize, file);
-	fclose(file);
+	if (file) {
+		(void) fwrite(debug_log_buffer, 1, debug_log_size, file);
+		fclose(file);
+	} else {
+		cc_log("Failed to open %s: %s", path, strerror(errno));
+	}
 }
 
 // Something went badly wrong!
@@ -229,7 +242,7 @@ fatal(const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	char msg[1000];
+	char msg[8192];
 	vsnprintf(msg, sizeof(msg), format, ap);
 	va_end(ap);
 
@@ -1279,6 +1292,17 @@ gnu_getcwd(void)
 	}
 }
 
+#ifndef HAVE_LOCALTIME_R
+// localtime_r replacement.
+struct tm *
+localtime_r(const time_t *timep, struct tm *result)
+{
+	struct tm *tm = localtime(timep);
+	*result = *tm;
+	return result;
+}
+#endif
+
 #ifndef HAVE_STRTOK_R
 // strtok_r replacement.
 char *
@@ -1825,5 +1849,16 @@ set_cloexec_flag(int fd)
 	}
 #else
 	(void)fd;
+#endif
+}
+
+double time_seconds(void)
+{
+#ifdef HAVE_GETTIMEOFDAY
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (double)tv.tv_sec + (double)tv.tv_usec / 1000000.0;
+#else
+	return (double)time(NULL);
 #endif
 }

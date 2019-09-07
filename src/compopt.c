@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2018 Joel Rosdahl
+// Copyright (C) 2010-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -30,6 +30,7 @@ struct compopt {
 };
 
 static const struct compopt compopts[] = {
+	{"--analyze",       TOO_HARD}, // clang
 	{"--compiler-bindir", AFFECTS_CPP | TAKES_ARG}, // nvcc
 	{"--libdevice-directory", AFFECTS_CPP | TAKES_ARG}, // nvcc
 	{"--output-directory", AFFECTS_CPP | TAKES_ARG}, // nvcc
@@ -59,6 +60,7 @@ static const struct compopt compopts[] = {
 	{"-Xclang",         TAKES_ARG},
 	{"-Xlinker",        TAKES_ARG},
 	{"-Xpreprocessor",  AFFECTS_CPP | TOO_HARD_DIRECT | TAKES_ARG},
+	{"-analyze",        TOO_HARD}, // clang
 	{"-arch",           TAKES_ARG},
 	{"-aux-info",       TAKES_ARG},
 	{"-b",              TAKES_ARG},
@@ -68,6 +70,7 @@ static const struct compopt compopts[] = {
 	{"-fplugin=libcc1plugin", TOO_HARD}, // interaction with GDB
 	{"-frepo",          TOO_HARD},
 	{"-fworking-directory", AFFECTS_CPP},
+	{"-gtoggle",        TOO_HARD},
 	{"-idirafter",      AFFECTS_CPP | TAKES_ARG | TAKES_CONCAT_ARG | TAKES_PATH},
 	{"-iframework",     AFFECTS_CPP | TAKES_ARG | TAKES_CONCAT_ARG | TAKES_PATH},
 	{"-imacros",        AFFECTS_CPP | TAKES_ARG | TAKES_CONCAT_ARG | TAKES_PATH},

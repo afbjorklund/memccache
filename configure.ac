@@ -22,6 +22,7 @@ esac
 AC_SUBST(ccache_memcached)
 AC_SUBST(disable_man)
 AC_SUBST(extra_libs)
+AC_SUBST(extra_sources)
 AC_SUBST(include_dev_mk)
 AC_SUBST(more_warnings)
 AC_SUBST(no_implicit_fallthrough_warning)
@@ -87,6 +88,7 @@ AC_CHECK_FUNCS(gethostname)
 AC_CHECK_FUNCS(getopt_long)
 AC_CHECK_FUNCS(getpwuid)
 AC_CHECK_FUNCS(gettimeofday)
+AC_CHECK_FUNCS(localtime_r)
 AC_CHECK_FUNCS(mkstemp)
 AC_CHECK_FUNCS(realpath)
 AC_CHECK_FUNCS(setenv)
@@ -192,6 +194,14 @@ if test x${enable_man} = xno; then
     disable_man='#'
 fi
 
+AC_ARG_ENABLE(tracing,
+  [AS_HELP_STRING([--enable-tracing],
+    [enable possibility to use internal ccache tracing])])
+if test x${enable_tracing} = xyes; then
+    CPPFLAGS="$CPPFLAGS -DMTR_ENABLED"
+    extra_sources="src/minitrace.c"
+fi
+
 dnl Linking on Windows needs ws2_32
 if test x${windows_os} = xyes; then
     LIBS="$LIBS -lws2_32"
@@ -230,6 +240,10 @@ if test ! -f $srcdir/dev_mode_disabled && test "$RUN_FROM_BUILD_FARM" != yes; th
     include_dev_mk='include dev.mk'
     version=`(git --git-dir=$srcdir/.git describe --dirty 2>/dev/null || echo vunknown) | sed -e 's/v//' -e 's/-/+/' -e 's/-/_/g'`
     echo "extern const char CCACHE_VERSION@<:@@:>@; const char CCACHE_VERSION@<:@@:>@ = \"$version\";" >src/version.c
+    AC_CHECK_TOOL(GPERF, gperf)
+    if test -z "$GPERF"; then
+        AC_MSG_ERROR(please install gperf)
+    fi
 else
     AC_MSG_NOTICE(developer mode disabled)
 fi

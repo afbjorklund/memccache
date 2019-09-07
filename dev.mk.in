@@ -1,7 +1,7 @@
 # GNU make syntax reigns in this file.
 
-all_cflags += -Werror @more_warnings@
-all_cppflags += -MD -MP -MF .deps/$(subst .._,,$(subst /,_,$<)).d
+all_cflags += -Werror
+all_cppflags += -MD -MP -MF .deps/$(subst .._,,$(subst /,_,$(subst $(srcdir)/,,$<))).d
 
 A2X = a2x
 ASCIIDOC = asciidoc
@@ -13,7 +13,7 @@ COMPILEDB = compiledb
 CLANG_TIDY = clang-tidy
 SCAN_BUILD = scan-build
 DOCKER = docker
-GPERF = gperf
+GPERF = @GPERF@
 TEST = test
 
 version := \
@@ -53,6 +53,7 @@ headers = \
     src/macroskip.h \
     src/manifest.h \
     src/mdfour.h \
+    src/minitrace.h \
     src/murmurhashneutral2.h \
     src/system.h \
     src/unify.h \
@@ -95,20 +96,15 @@ source_dist_files = \
     src/envtoconfitems.gperf \
     src/envtoconfitems_lookup.c \
     src/main.c \
+    src/minitrace.c \
     src/zlib/*.c \
     src/zlib/*.h \
     test/run \
-    test/suites/*
+    test/suites/*.bash
 
 dist_files = \
     $(addprefix $(srcdir)/, $(source_dist_files)) \
     $(built_dist_files)
-
-uncrustify_exclude_files = \
-    src/getopt_long.c \
-    src/hashtable.c \
-    src/hashtable_itr.c \
-    src/snprintf.c
 
 ifneq ($(shell sed 's/.*"\(.*\)".*/\1/' src/version.c 2>/dev/null),$(version))
   $(shell echo 'extern const char CCACHE_VERSION[]; const char CCACHE_VERSION[] = "$(version)";' >src/version.c)
@@ -193,13 +189,15 @@ docs: $(generated_docs)
 	$(Q)$(ASCIIDOC) -a revnumber=$(version) -d manpage -b docbook -o - $< | \
 	  perl -pe 's!<literal>(.*?)</literal>!<emphasis role="strong">\1</emphasis>!g' >$@
 
+$(non_3pp_objs) $(test_objs): CFLAGS += @more_warnings@
+
 doc/ccache.1: doc/MANUAL.xml
 	$(if $(quiet),@echo "  A2X      $@")
 	$(Q)$(A2X) --doctype manpage --format manpage $<
 
 .PHONY: update-authors
 update-authors:
-	git log --pretty=format:"* %aN <%aE>" \
+	git log --pretty=format:"* %aN" \
 	  | sort -u \
 	  | perl -00 -p -i -e 's/^\*.*/<STDIN> . "\n"/es' doc/AUTHORS.adoc
 
@@ -220,7 +218,7 @@ shellcheck: test/suites/*.bash
 
 .PHONY: uncrustify
 uncrustify:
-	uncrustify -c misc/uncrustify.cfg --no-backup --replace $(filter-out $(uncrustify_exclude_files), $(base_sources)) $(test_sources)
+	uncrustify -c misc/uncrustify.cfg --no-backup --replace $(non_3pp_sources) $(test_sources)
 
 # pip install compiledb
 compile_commands.json:
@@ -247,6 +245,6 @@ docker: buildenv/$(BUILDENV)/Dockerfile
 travis: .travis/Dockerfile
 	$(DOCKER) inspect travis-build >/dev/null || $(DOCKER) build -t travis-build .travis
 	$(DOCKER) run --rm --volume $(PWD):/src --tmpfs /dst:rw,exec --env ASAN_OPTIONS='$(ASAN_OPTIONS)' travis-build \
-	sh -c "cd /src && ./autogen.sh && cd /dst && CC=$(CC) CFLAGS='$(CFLAGS)' /src/configure $(HOST) && make && make $(TEST)"
+	sh -c "cd /src && ./autogen.sh && cd /dst && CC=$(CC) CFLAGS='$(CFLAGS)' LDFLAGS='$(LDFLAGS)' /src/configure $(HOST) && make V=$(V) && make V=$(V) $(TEST)"
 
 -include .deps/*.d

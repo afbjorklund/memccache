@@ -59,8 +59,11 @@ generated_sources = \
     src/hashtable_itr.c \
     src/murmurhashneutral2.c \
     src/snprintf.c
-base_sources = $(non_3pp_sources) $(generated_sources) $(3pp_sources)
+extra_sources = @extra_sources@
+base_sources = $(non_3pp_sources) $(generated_sources) $(3pp_sources) $(extra_sources)
 base_objs = $(base_sources:.c=.o)
+
+non_3pp_objs = $(non_3pp_sources:.c=.o)
 
 ccache_sources = src/main.c $(base_sources)
 ccache_objs = $(ccache_sources:.c=.o)
@@ -134,9 +137,9 @@ src/zlib/libz.a: $(zlib_objs)
 	$(if $(quiet),@echo "  RANLIB   $@")
 	$(Q)$(RANLIB) $@
 
-.PHONY: perf
-perf: ccache$(EXEEXT)
-	$(srcdir)/perf/perf.py --ccache ccache$(EXEEXT) $(CC) $(all_cppflags) $(all_cflags) $(srcdir)/src/ccache.c
+.PHONY: performance
+performance: ccache$(EXEEXT)
+	$(srcdir)/misc/performance --ccache ccache$(EXEEXT) $(CC) $(all_cppflags) $(all_cflags) $(srcdir)/src/ccache.c
 
 .PHONY: test
 test: ccache$(EXEEXT) unittest/run$(EXEEXT)

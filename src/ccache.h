@@ -21,6 +21,7 @@
 #include "system.h"
 #include "conf.h"
 #include "counters.h"
+#include "minitrace.h"
 
 #ifdef __GNUC__
 #define ATTR_FORMAT(x, y, z) __attribute__((format (x, y, z)))
@@ -54,7 +55,7 @@ enum stats {
 	STATS_OBSOLETE_MAXFILES = 13,
 	STATS_OBSOLETE_MAXSIZE = 14,
 	STATS_SOURCELANG = 15,
-	STATS_DEVICE = 16,
+	STATS_BADOUTPUTFILE = 16,
 	STATS_NOINPUT = 17,
 	STATS_MULTIPLE = 18,
 	STATS_CONFTEST = 19,
@@ -144,7 +145,7 @@ bool args_equal(struct args *args1, struct args *args2);
 void cc_log(const char *format, ...) ATTR_FORMAT(printf, 1, 2);
 void cc_bulklog(const char *format, ...) ATTR_FORMAT(printf, 1, 2);
 void cc_log_argv(const char *prefix, char **argv);
-void cc_dump_log_buffer(const char *path);
+void cc_dump_debug_log_buffer(const char *path);
 void fatal(const char *format, ...) ATTR_FORMAT(printf, 1, 2) ATTR_NORETURN;
 void warn(const char *format, ...) ATTR_FORMAT(printf, 1, 2);
 
@@ -185,6 +186,9 @@ char *format_parsable_size_with_suffix(uint64_t size);
 bool parse_size_with_suffix(const char *str, uint64_t *size);
 char *x_realpath(const char *path);
 char *gnu_getcwd(void);
+#ifndef HAVE_LOCALTIME_R
+struct tm *localtime_r(const time_t *timep, struct tm *result);
+#endif
 #ifndef HAVE_STRTOK_R
 char *strtok_r(char *str, const char *delim, char **saveptr);
 #endif
@@ -211,6 +215,7 @@ bool read_file(const char *path, size_t size_hint, char **data, size_t *size);
 char *read_text_file(const char *path, size_t size_hint);
 char *subst_env_in_string(const char *str, char **errmsg);
 void set_cloexec_flag(int fd);
+double time_seconds(void);
 
 // ----------------------------------------------------------------------------
 // memccached.c
@@ -237,6 +242,7 @@ void stats_flush(void);
 unsigned stats_get_pending(enum stats stat);
 void stats_zero(void);
 void stats_summary(void);
+void stats_print(void);
 void stats_update_size(int64_t size, int files);
 void stats_get_obsolete_limits(const char *dir, unsigned *maxfiles,
                                uint64_t *maxsize);
