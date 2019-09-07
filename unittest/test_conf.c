@@ -1,4 +1,4 @@
-// Copyright (C) 2011-2018 Joel Rosdahl
+// Copyright (C) 2011-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -18,7 +18,7 @@
 #include "framework.h"
 #include "util.h"
 
-#define N_CONFIG_ITEMS 36
+#define N_CONFIG_ITEMS 37
 static struct {
 	char *descr;
 	char *origin;
@@ -59,6 +59,7 @@ TEST(conf_create)
 	CHECK_INT_EQ(6, conf->compression_level);
 	CHECK_STR_EQ("", conf->cpp_extension);
 	CHECK(!conf->debug);
+	CHECK(!conf->depend_mode);
 	CHECK(conf->direct_mode);
 	CHECK(!conf->disable);
 	CHECK_STR_EQ("", conf->extra_files_to_hash);
@@ -66,7 +67,7 @@ TEST(conf_create)
 	CHECK(conf->hash_dir);
 	CHECK_STR_EQ("", conf->ignore_headers_in_manifest);
 	CHECK(!conf->keep_comments_cpp);
-	CHECK_FLOAT_EQ(0.8f, conf->limit_multiple);
+	CHECK_DOUBLE_EQ(0.8, conf->limit_multiple);
 	CHECK_STR_EQ("", conf->log_file);
 	CHECK_INT_EQ(0, conf->max_files);
 	CHECK_INT_EQ((uint64_t)5 * 1000 * 1000 * 1000, conf->max_size);
@@ -114,6 +115,7 @@ TEST(conf_read_valid_config)
 		"compression=true\n"
 		"compression_level= 2\n"
 		"cpp_extension = .foo\n"
+		"depend_mode = true\n"
 		"direct_mode = false\n"
 		"disable = true\n"
 		"extra_files_to_hash = a:b c:$USER\n"
@@ -136,7 +138,7 @@ TEST(conf_read_valid_config)
 		"read_only_memcached = false\n"
 		"recache = true\n"
 		"run_second_cpp = false\n"
-		"sloppiness =     file_macro   ,time_macros,  include_file_mtime,include_file_ctime,file_stat_matches,file_stat_matches_ctime,pch_defines ,  no_system_headers  \n"
+		"sloppiness =     file_macro   ,time_macros,  include_file_mtime,include_file_ctime,file_stat_matches,file_stat_matches_ctime,pch_defines ,  no_system_headers,system_headers,clang_index_store\n"
 		"stats = false\n"
 		"temporary_dir = ${USER}_foo\n"
 		"umask = 777\n"
@@ -156,6 +158,7 @@ TEST(conf_read_valid_config)
 	CHECK(conf->compression);
 	CHECK_INT_EQ(2, conf->compression_level);
 	CHECK_STR_EQ(".foo", conf->cpp_extension);
+	CHECK(conf->depend_mode);
 	CHECK(!conf->direct_mode);
 	CHECK(conf->disable);
 	CHECK_STR_EQ_FREE1(format("a:b c:%s", user), conf->extra_files_to_hash);
@@ -163,7 +166,7 @@ TEST(conf_read_valid_config)
 	CHECK(!conf->hash_dir);
 	CHECK_STR_EQ("a:b/c", conf->ignore_headers_in_manifest);
 	CHECK(conf->keep_comments_cpp);
-	CHECK_FLOAT_EQ(1.0, conf->limit_multiple);
+	CHECK_DOUBLE_EQ(1.0, conf->limit_multiple);
 	CHECK_STR_EQ_FREE1(format("%s%s", user, user), conf->log_file);
 	CHECK_INT_EQ(17, conf->max_files);
 	CHECK_INT_EQ(123 * 1000 * 1000, conf->max_size);
@@ -178,11 +181,17 @@ TEST(conf_read_valid_config)
 	CHECK(!conf->read_only_memcached);
 	CHECK(conf->recache);
 	CHECK(!conf->run_second_cpp);
-	CHECK_INT_EQ(SLOPPY_INCLUDE_FILE_MTIME|SLOPPY_INCLUDE_FILE_CTIME|
-	             SLOPPY_FILE_MACRO|SLOPPY_TIME_MACROS|
-	             SLOPPY_FILE_STAT_MATCHES|SLOPPY_FILE_STAT_MATCHES_CTIME|
-	             SLOPPY_NO_SYSTEM_HEADERS|SLOPPY_PCH_DEFINES,
-	             conf->sloppiness);
+	CHECK_INT_EQ(
+		SLOPPY_INCLUDE_FILE_MTIME
+		|SLOPPY_INCLUDE_FILE_CTIME
+		|SLOPPY_FILE_MACRO
+		|SLOPPY_TIME_MACROS
+		|SLOPPY_FILE_STAT_MATCHES
+		|SLOPPY_FILE_STAT_MATCHES_CTIME
+		|SLOPPY_SYSTEM_HEADERS
+		|SLOPPY_PCH_DEFINES
+		|SLOPPY_CLANG_INDEX_STORE,
+		conf->sloppiness);
 	CHECK(!conf->stats);
 	CHECK_STR_EQ_FREE1(format("%s_foo", user), conf->temporary_dir);
 	CHECK_INT_EQ(0777, conf->umask);
@@ -407,7 +416,7 @@ TEST(conf_print_existing_value)
 		FILE *log = fopen("log", "r");
 		CHECK(log);
 		char buf[100];
-		CHECK(fgets(buf, 100, log));
+		CHECK(fgets(buf, sizeof(buf), log));
 		CHECK_STR_EQ("42\n", buf);
 		fclose(log);
 	}
@@ -430,7 +439,7 @@ TEST(conf_print_unknown_value)
 		FILE *log = fopen("log", "r");
 		CHECK(log);
 		char buf[100];
-		CHECK(!fgets(buf, 100, log));
+		CHECK(!fgets(buf, sizeof(buf), log));
 		fclose(log);
 	}
 	conf_free(conf);
@@ -449,6 +458,7 @@ TEST(conf_print_items)
 		8,
 		"ce",
 		false,
+		true,
 		false,
 		true,
 		"efth",
@@ -474,7 +484,7 @@ TEST(conf_print_items)
 		SLOPPY_FILE_MACRO|SLOPPY_INCLUDE_FILE_MTIME|
 		SLOPPY_INCLUDE_FILE_CTIME|SLOPPY_TIME_MACROS|
 		SLOPPY_FILE_STAT_MATCHES|SLOPPY_FILE_STAT_MATCHES_CTIME|
-		SLOPPY_PCH_DEFINES|SLOPPY_NO_SYSTEM_HEADERS,
+		SLOPPY_PCH_DEFINES|SLOPPY_SYSTEM_HEADERS|SLOPPY_CLANG_INDEX_STORE,
 		false,
 		"td",
 		022,
@@ -503,6 +513,7 @@ TEST(conf_print_items)
 	CHECK_STR_EQ("compression_level = 8", received_conf_items[n++].descr);
 	CHECK_STR_EQ("cpp_extension = ce", received_conf_items[n++].descr);
 	CHECK_STR_EQ("debug = false", received_conf_items[n++].descr);
+	CHECK_STR_EQ("depend_mode = true", received_conf_items[n++].descr);
 	CHECK_STR_EQ("direct_mode = false", received_conf_items[n++].descr);
 	CHECK_STR_EQ("disable = true", received_conf_items[n++].descr);
 	CHECK_STR_EQ("extra_files_to_hash = efth", received_conf_items[n++].descr);
@@ -528,7 +539,8 @@ TEST(conf_print_items)
 	CHECK_STR_EQ("run_second_cpp = false", received_conf_items[n++].descr);
 	CHECK_STR_EQ("sloppiness = file_macro, include_file_mtime,"
 	             " include_file_ctime, time_macros, pch_defines,"
-	             " file_stat_matches, file_stat_matches_ctime, no_system_headers",
+	             " file_stat_matches, file_stat_matches_ctime, system_headers,"
+	             " clang_index_store",
 	             received_conf_items[n++].descr);
 	CHECK_STR_EQ("stats = false", received_conf_items[n++].descr);
 	CHECK_STR_EQ("temporary_dir = td", received_conf_items[n++].descr);

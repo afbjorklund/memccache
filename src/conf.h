@@ -13,6 +13,7 @@ struct conf {
 	unsigned compression_level;
 	char *cpp_extension;
 	bool debug;
+	bool depend_mode;
 	bool direct_mode;
 	bool disable;
 	char *extra_files_to_hash;
@@ -20,7 +21,7 @@ struct conf {
 	bool hash_dir;
 	char *ignore_headers_in_manifest;
 	bool keep_comments_cpp;
-	float limit_multiple;
+	double limit_multiple;
 	char *log_file;
 	unsigned max_files;
 	uint64_t max_size;

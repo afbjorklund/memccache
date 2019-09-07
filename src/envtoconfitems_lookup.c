@@ -1,5 +1,5 @@
 /* ANSI-C code produced by gperf version 3.0.4 */
-/* Command-line: gperf src/envtoconfitems.gperf  */
+/* Command-line: gperf  */
 /* Computed positions: -k'4-5,11' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -26,10 +26,10 @@
       && ('w' == 119) && ('x' == 120) && ('y' == 121) && ('z' == 122) \
       && ('{' == 123) && ('|' == 124) && ('}' == 125) && ('~' == 126))
 /* The character set is not based on ISO-646.  */
-#error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gnu-gperf@gnu.org>."
+#warning "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gnu-gperf@gnu.org>."
 #endif
 
-#line 9 "src/envtoconfitems.gperf"
+#include "envtoconfitems.h"
 struct env_to_conf_item;
 /* maximum key range = 52, duplicates = 0 */
 
@@ -41,7 +41,7 @@ inline
 #endif
 #endif
 static unsigned int
-envtoconfitems_hash (register const char *str, register unsigned int len)
+envtoconfitems_hash (register const char *str, register size_t len)
 {
   static const unsigned char asso_values[] =
     {
@@ -51,8 +51,8 @@ envtoconfitems_hash (register const char *str, register unsigned int len)
       54, 54, 54, 54, 54, 54, 54, 54, 54, 54,
       54, 54, 54, 54, 54, 54, 54, 54, 54, 54,
        0, 54, 54, 54, 54, 54, 54, 54, 54, 54,
-      54, 54, 54, 54, 54, 15, 20,  0,  0, 10,
-       0,  5, 20,  0, 54, 15, 45, 15,  0, 10,
+      54, 54, 54, 54, 54, 15,  5,  0,  0, 10,
+       0,  5, 40,  0, 54, 15, 45, 15,  5, 10,
        5, 54, 10, 25,  0,  5, 20, 54, 54,  0,
       54, 54, 54, 54, 54, 20, 54, 54, 54, 54,
       54, 54, 54, 54, 54, 54, 54, 54, 54, 54,
@@ -97,19 +97,12 @@ envtoconfitems_hash (register const char *str, register unsigned int len)
   return hval;
 }
 
-static
-#ifdef __GNUC__
-__inline
-#if defined __GNUC_STDC_INLINE__ || defined __GNUC_GNU_INLINE__
-__attribute__ ((__gnu_inline__))
-#endif
-#endif
 const struct env_to_conf_item *
-envtoconfitems_get (register const char *str, register unsigned int len)
+envtoconfitems_get (register const char *str, register size_t len)
 {
   enum
     {
-      TOTAL_KEYWORDS = 37,
+      TOTAL_KEYWORDS = 38,
       MIN_WORD_LENGTH = 2,
       MAX_WORD_LENGTH = 18,
       MIN_HASH_VALUE = 2,
@@ -119,90 +112,53 @@ envtoconfitems_get (register const char *str, register unsigned int len)
   static const struct env_to_conf_item wordlist[] =
     {
       {"",""}, {"",""},
-#line 12 "src/envtoconfitems.gperf"
       {"CC", "compiler"},
-#line 19 "src/envtoconfitems.gperf"
       {"DIR", "cache_dir"},
-#line 17 "src/envtoconfitems.gperf"
       {"CPP2", "run_second_cpp"},
-#line 47 "src/envtoconfitems.gperf"
       {"UNIFY", "unify"},
-#line 37 "src/envtoconfitems.gperf"
       {"PREFIX", "prefix_command"},
-#line 29 "src/envtoconfitems.gperf"
       {"LOGFILE", "log_file"},
-#line 30 "src/envtoconfitems.gperf"
       {"MAXFILES", "max_files"},
       {"",""},
-#line 38 "src/envtoconfitems.gperf"
       {"PREFIX_CPP", "prefix_command_cpp"},
       {"",""},
-#line 45 "src/envtoconfitems.gperf"
       {"TEMPDIR", "temporary_dir"},
-#line 13 "src/envtoconfitems.gperf"
       {"COMPILER", "compiler"},
-#line 28 "src/envtoconfitems.gperf"
       {"LIMIT_MULTIPLE", "limit_multiple"},
-#line 20 "src/envtoconfitems.gperf"
       {"DEBUG", "debug"},
-#line 21 "src/envtoconfitems.gperf"
       {"DIRECT", "direct_mode"},
-#line 11 "src/envtoconfitems.gperf"
       {"BASEDIR", "base_dir"},
-#line 39 "src/envtoconfitems.gperf"
       {"READONLY", "read_only"},
-#line 23 "src/envtoconfitems.gperf"
-      {"EXTENSION", "cpp_extension"},
-#line 43 "src/envtoconfitems.gperf"
-      {"SLOPPINESS", "sloppiness"},
       {"",""},
-#line 42 "src/envtoconfitems.gperf"
+      {"SLOPPINESS", "sloppiness"},
+      {"DEPEND", "depend_mode"},
       {"RECACHE", "recache"},
-#line 15 "src/envtoconfitems.gperf"
       {"COMPRESS", "compression"},
-#line 35 "src/envtoconfitems.gperf"
-      {"PATH", "path"},
-#line 40 "src/envtoconfitems.gperf"
+      {"EXTENSION", "cpp_extension"},
       {"READONLY_DIRECT", "read_only_direct"},
       {"",""},
-#line 26 "src/envtoconfitems.gperf"
-      {"HASHDIR", "hash_dir"},
-#line 14 "src/envtoconfitems.gperf"
+      {"DISABLE", "disable"},
       {"COMPILERCHECK", "compiler_check"},
-#line 32 "src/envtoconfitems.gperf"
       {"MEMCACHED_CONF", "memcached_conf"},
-#line 44 "src/envtoconfitems.gperf"
       {"STATS", "stats"},
       {"",""},
-#line 31 "src/envtoconfitems.gperf"
       {"MAXSIZE", "max_size"},
-#line 18 "src/envtoconfitems.gperf"
       {"COMMENTS", "keep_comments_cpp"},
       {"",""},
-#line 24 "src/envtoconfitems.gperf"
       {"EXTRAFILES", "extra_files_to_hash"},
       {"",""},
-#line 34 "src/envtoconfitems.gperf"
       {"NLEVELS", "cache_dir_levels"},
-#line 41 "src/envtoconfitems.gperf"
       {"READONLY_MEMCACHED", "read_only_memcached"},
-#line 33 "src/envtoconfitems.gperf"
       {"MEMCACHED_ONLY", "memcached_only"},
-#line 36 "src/envtoconfitems.gperf"
       {"PCH_EXTSUM", "pch_external_checksum"},
-      {"",""},
-#line 22 "src/envtoconfitems.gperf"
-      {"DISABLE", "disable"},
-#line 27 "src/envtoconfitems.gperf"
-      {"IGNOREHEADERS", "ignore_headers_in_manifest"},
-      {"",""},
-#line 46 "src/envtoconfitems.gperf"
-      {"UMASK", "umask"},
       {"",""}, {"",""},
-#line 16 "src/envtoconfitems.gperf"
+      {"IGNOREHEADERS", "ignore_headers_in_manifest"},
+      {"PATH", "path"},
+      {"UMASK", "umask"},
+      {"",""},
+      {"HASHDIR", "hash_dir"},
       {"COMPRESSLEVEL", "compression_level"},
       {"",""}, {"",""}, {"",""}, {"",""},
-#line 25 "src/envtoconfitems.gperf"
       {"HARDLINK", "hard_link"}
     };
 
@@ -220,4 +176,4 @@ envtoconfitems_get (register const char *str, register unsigned int len)
     }
   return 0;
 }
-static const size_t ENVTOCONFITEMS_TOTAL_KEYWORDS = 37;
+size_t envtoconfitems_count(void) { return 38; }

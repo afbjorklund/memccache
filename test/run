@@ -383,6 +383,8 @@ debug_prefix_map
 masquerading
 hardlink
 direct
+direct_gcc
+depend
 basedir
 compression
 readonly

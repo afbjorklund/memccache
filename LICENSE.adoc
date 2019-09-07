@@ -29,7 +29,7 @@ Copyright and authors
 ---------------------
 
 ccache is a collective work with contributions from many people, listed in
-AUTHORS.adoc and at https://ccache.samba.org/authors.html. Subsequent additions
+AUTHORS.adoc and at https://ccache.samba.org/credits.html. Subsequent additions
 by contributing authors are implicitly licensed to the public under the same
 terms (GNU GPL version 3 or later), but the contributing authors retain
 copyrights on their portions of the work.
@@ -38,7 +38,7 @@ The copyright for ccache as a whole is as follows:
 
 -------------------------------------------------------------------------------
   Copyright (C) 2002-2007 Andrew Tridgell
-  Copyright (C) 2009-2018 Joel Rosdahl
+  Copyright (C) 2009-2019 Joel Rosdahl
 -------------------------------------------------------------------------------
 
 

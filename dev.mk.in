@@ -1,6 +1,6 @@
 # GNU make syntax reigns in this file.
 
-all_cflags += -Werror
+all_cflags += -Werror @more_warnings@
 all_cppflags += -MD -MP -MF .deps/$(subst .._,,$(subst /,_,$<)).d
 
 A2X = a2x
@@ -9,6 +9,8 @@ CPPCHECK = cppcheck
 CPPCHECK_SUPPRESSIONS = misc/cppcheck-suppressions.txt
 SHELLCHECK = shellcheck
 SHELLCHECK_EXCLUDES = misc/shellcheck-excludes.txt
+COMPILEDB = compiledb
+CLANG_TIDY = clang-tidy
 SCAN_BUILD = scan-build
 DOCKER = docker
 GPERF = gperf
@@ -38,7 +40,9 @@ headers = \
     src/ccache.h \
     src/compopt.h \
     src/conf.h \
+    src/confitems.h \
     src/counters.h \
+    src/envtoconfitems.h \
     src/getopt_long.h \
     src/hash.h \
     src/hashtable.h \
@@ -58,6 +62,9 @@ generated_headers = \
     unittest/suites.h
 
 files_to_clean += *.tar.bz2 *.tar.gz *.tar.xz *.xml .deps/* perfdir.*
+files_to_clean += compile_commands.json
+files_to_clean += src/confitems_lookup.c
+files_to_clean += src/envtoconfitems_lookup.c
 files_to_distclean += $(built_dist_files) src/version.c unittest/suites.h
 files_to_distclean += .deps dev.mk
 
@@ -108,10 +115,23 @@ ifneq ($(shell sed 's/.*"\(.*\)".*/\1/' src/version.c 2>/dev/null),$(version))
 endif
 src/version.o: src/version.c
 
-%_lookup.c: %.gperf
-	$(if $(quiet),@echo "  GPERF    $@")
-	$(Q)$(GPERF) $< | awk '/#ifdef __GNUC__/ { ++i; if (i == 2) { print "static"; }} {print}' >$@
-	$(Q)echo "static const size_t $$(echo $(notdir $*) | tr a-z A-Z)_TOTAL_KEYWORDS = $$(sed -nr 's/.*TOTAL_KEYWORDS = ([0-9]+).*/\1/p' $@);" >>$@
+# $(1): Name.
+# $(2): Command for fixing up source file before the gperf call.
+define generate_gperf_lookup
+src/$(1)_lookup.c: src/$(1).gperf
+	$$(if $$(quiet),@echo "  GEN      $$@")
+	$$(Q)$(2) $$< | $$(GPERF) | sed 's/#error/#warning/' >$$@.tmp
+# Fix for gperf < 3.1 (fix parameter type and remove inlining of the get function):
+	$$(Q)perl -00 -pi -e 's/unsigned int len/size_t len/; s/#ifdef __GNUC__.*?gnu_inline.*?#endif\n#endif\n//sg' $$@.tmp
+	$$(Q)echo "size_t $(1)_count(void) { return $$$$(perl -ne '/TOTAL_KEYWORDS = (.+?),/ && print $$$$1' $$@.tmp); }" >>$$@.tmp
+	$$(Q)mv $$@.tmp $$@
+endef
+
+add_confitems_numbers = \
+    perl -pae '$$$$s = 1 if /^%%/; s/ITEM/$$$$n++ . ", ITEM"/e if $$$$s == 1'
+
+$(eval $(call generate_gperf_lookup,confitems,$(add_confitems_numbers)))
+$(eval $(call generate_gperf_lookup,envtoconfitems,cat))
 
 .PHONY: dist
 dist: $(dist_archives)
@@ -136,33 +156,27 @@ $(dist_archives): $(dist_files)
 	 tar -c $$tarcompression -f $(CURDIR)/$@ $(dist_dir)) && \
 	rm -rf $$tmpdir
 
+# $(1): extra configure options
+define do_distcheck
+	tmpdir=$$(mktemp -d /tmp/tmp-ccache-distcheck.XXXXXX) && \
+	(cd $$tmpdir && \
+	 tar xf $(CURDIR)/$< && \
+	 mkdir -p $(dist_dir)/build && \
+	 chmod -R a-w $(dist_dir) && \
+	 chmod u+w $(dist_dir)/build && \
+	 cd $(dist_dir)/build && \
+	 ../configure --enable-more-warnings --prefix=$$tmpdir/root $(1) && \
+	 $(MAKE) install CFLAGS=-Werror V=1 && \
+	 $(MAKE) installcheck) && \
+	chmod -R u+w $$tmpdir/$(dist_dir) && \
+	rm -rf $$tmpdir
+endef
+
 .PHONY: distcheck
 distcheck: $(firstword $(dist_archives))
-	tmpdir=$$(mktemp -d /tmp/tmp-ccache-distcheck.XXXXXX) && \
-	(cd $$tmpdir && \
-	 tar xf $(CURDIR)/$< && \
-	 mkdir -p $(dist_dir)/build && \
-	 chmod -R a-w $(dist_dir) && \
-	 chmod u+w $(dist_dir)/build && \
-	 cd $(dist_dir)/build && \
-	 ../configure --prefix=$$tmpdir/root && \
-	 $(MAKE) install && \
-	 $(MAKE) installcheck) && \
-	chmod -R u+w $$tmpdir/$(dist_dir) && \
-	rm -rf $$tmpdir
-
-	tmpdir=$$(mktemp -d /tmp/tmp-ccache-distcheck.XXXXXX) && \
-	(cd $$tmpdir && \
-	 tar xf $(CURDIR)/$< && \
-	 mkdir -p $(dist_dir)/build && \
-	 chmod -R a-w $(dist_dir) && \
-	 chmod u+w $(dist_dir)/build && \
-	 cd $(dist_dir)/build && \
-	 ../configure --prefix=$$tmpdir/root --with-bundled-zlib && \
-	 $(MAKE) install && \
-	 $(MAKE) installcheck) && \
-	chmod -R u+w $$tmpdir/$(dist_dir) && \
-	rm -rf $$tmpdir
+	$(call do_distcheck, --without-bundled-zlib)
+	$(call do_distcheck, --with-bundled-zlib)
+	$(call do_distcheck, CC=clang)
 
 .PHONY: docs
 docs: $(generated_docs)
@@ -197,7 +211,8 @@ check-syntax:
 cppcheck:
 	$(CPPCHECK) --suppressions-list=$(CPPCHECK_SUPPRESSIONS) \
 	  --inline-suppr -q --enable=all --force -I . \
-	  $(non_3pp_sources) src/main.c $(test_sources)
+	  --template='cppcheck: warning: {id}:{file}:{line}: {message}' \
+	  $(non_3pp_sources) src/confitems_lookup.c src/main.c $(test_sources)
 
 .PHONY: shellcheck
 shellcheck: test/suites/*.bash
@@ -207,14 +222,26 @@ shellcheck: test/suites/*.bash
 uncrustify:
 	uncrustify -c misc/uncrustify.cfg --no-backup --replace $(filter-out $(uncrustify_exclude_files), $(base_sources)) $(test_sources)
 
+# pip install compiledb
+compile_commands.json:
+	$(COMPILEDB) -n $(MAKE) all unittest
+
+.PHONY: tidy
+tidy: compile_commands.json
+	$(CLANG_TIDY) $(all_sources)
+
 .PHONY: analyze
 analyze:
 	$(SCAN_BUILD) --use-cc=$(CC) $(srcdir)/configure
 	$(SCAN_BUILD) --use-cc=$(CC) --status-bugs $(MAKE) -B
 
+BUILDENV = ubuntu
+DOCKER_IMAGE_TAG = ccache/build:$(BUILDENV)
+
 .PHONY: docker
-docker: misc/Dockerfile
-	$(DOCKER) build -f $< $(srcdir)
+docker: buildenv/$(BUILDENV)/Dockerfile
+	$(DOCKER) inspect $(DOCKER_IMAGE_TAG) >/dev/null || $(DOCKER) build -t $(DOCKER_IMAGE_TAG) buildenv/$(BUILDENV)
+	$(DOCKER) run --rm -v $(PWD):/build -w /build $(DOCKER_IMAGE_TAG) misc/build.sh $(TEST)
 
 .PHONY: travis
 travis: .travis/Dockerfile

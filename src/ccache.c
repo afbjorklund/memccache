@@ -1,7 +1,7 @@
 // ccache -- a fast C/C++ compiler cache
 //
 // Copyright (C) 2002-2007 Andrew Tridgell
-// Copyright (C) 2009-2018 Joel Rosdahl
+// Copyright (C) 2009-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -47,7 +47,7 @@ static const char VERSION_TEXT[] =
 	MYNAME " version %s\n"
 	"\n"
 	"Copyright (C) 2002-2007 Andrew Tridgell\n"
-	"Copyright (C) 2009-2018 Joel Rosdahl\n"
+	"Copyright (C) 2009-2019 Joel Rosdahl\n"
 	"\n"
 	"This program is free software; you can redistribute it and/or modify it under\n"
 	"the terms of the GNU General Public License as published by the Free Software\n"
@@ -243,7 +243,10 @@ static bool profile_use = false;
 static bool profile_generate = false;
 
 // Sanitize blacklist
-static char *sanitize_blacklist = NULL;
+static char **sanitize_blacklists = NULL;
+
+// Size of sanitize_blacklists
+static size_t sanitize_blacklists_len = 0;
 
 // Whether we are using a precompiled header (either via -include, #include or
 // clang's -include-pch or -include-pth).
@@ -285,15 +288,18 @@ static const char HASH_PREFIX[] = "3";
 
 static void from_fscache(enum fromcache_call_mode mode,
                          bool put_object_in_manifest);
-static void to_fscache(struct args *args);
+static void to_fscache(struct args *args,
+                       struct hash *depend_mode_hash);
 #ifdef HAVE_LIBMEMCACHED
 static void from_memcached(enum fromcache_call_mode mode,
                            bool put_object_in_manifest);
-static void to_memcached(struct args *args);
+static void to_memcached(struct args *args,
+                         struct hash *depend_mode_hash);
 #endif
 static void (*from_cache)(enum fromcache_call_mode mode,
                           bool put_object_in_manifest);
-static void (*to_cache)(struct args *args);
+static void (*to_cache)(struct args *args,
+                        struct hash *depend_mode_hash);
 
 static void
 add_prefix(struct args *args, char *prefix_command)
@@ -599,7 +605,8 @@ get_path_in_cache(const char *name, const char *suffix)
 // global included_files variable. If the include file is a PCH, cpp_hash is
 // also updated. Takes over ownership of path.
 static void
-remember_include_file(char *path, struct hash *cpp_hash, bool system)
+remember_include_file(char *path, struct hash *cpp_hash, bool system,
+                      struct hash *depend_mode_hash)
 {
 	struct hash *fhash = NULL;
 
@@ -614,7 +621,7 @@ remember_include_file(char *path, struct hash *cpp_hash, bool system)
 		goto out;
 	}
 
-	if (system && (conf->sloppiness & SLOPPY_NO_SYSTEM_HEADERS)) {
+	if (system && (conf->sloppiness & SLOPPY_SYSTEM_HEADERS)) {
 		// Don't remember this system header.
 		goto out;
 	}
@@ -740,6 +747,11 @@ remember_include_file(char *path, struct hash *cpp_hash, bool system)
 		h->size = hash_input_size(fhash);
 		hashtable_insert(included_files, path, h);
 		path = NULL; // Ownership transferred to included_files.
+
+		if (depend_mode_hash) {
+			hash_delimiter(depend_mode_hash, "include");
+			hash_buffer(depend_mode_hash, h->hash, sizeof(h->hash));
+		}
 	}
 
 	goto out;
@@ -753,6 +765,16 @@ failure:
 out:
 	hash_free(fhash);
 	free(path);
+}
+
+static void
+print_included_files(FILE *fp)
+{
+	struct hashtable_itr *iter = hashtable_iterator(included_files);
+	do {
+		char *path = hashtable_iterator_key(iter);
+		fprintf(fp, "%s\n", path);
+	} while (hashtable_iterator_advance(iter));
 }
 
 // Make a relative path from current working directory to path if path is under
@@ -779,15 +801,21 @@ make_relative_path(char *path)
 	if (stat(path, &st) != 0) {
 		// path doesn't exist.
 		char *dir = dirname(path);
-		if (stat(dir, &st) != 0) {
-			// And neither does its parent directory, so no action to take.
+		// find the nearest existing directory in path
+		while (stat(dir, &st) != 0) {
+			char *parent_dir = dirname(dir);
 			free(dir);
-			return path;
+			dir = parent_dir;
 		}
-		free(dir);
-		path_suffix = basename(path);
+
+		// suffix is the remaining of the path, skip the first delimiter
+		size_t dir_len = strlen(dir);
+		if (path[dir_len] == '/' || path[dir_len] == '\\') {
+			dir_len++;
+		}
+		path_suffix = x_strdup(&path[dir_len]);
 		char *p = path;
-		path = dirname(path);
+		path = dir;
 		free(p);
 	}
 
@@ -808,6 +836,16 @@ make_relative_path(char *path)
 		// path doesn't exist, so leave it as it is.
 		free(path_suffix);
 		return path;
+	}
+}
+
+static void
+init_included_files_table(void)
+{
+	// (This function may be called multiple times if several -arch options are
+	// used.)
+	if (!included_files) {
+		included_files = create_hashtable(1000, hash_from_string, strings_equal);
 	}
 }
 
@@ -842,9 +880,7 @@ process_preprocessed_file(struct hash *hash, const char *path, bool pump)
 		free(p);
 	}
 
-	if (!included_files) {
-		included_files = create_hashtable(1000, hash_from_string, strings_equal);
-	}
+	init_included_files_table();
 
 	char *cwd = gnu_getcwd();
 
@@ -963,7 +999,7 @@ process_preprocessed_file(struct hash *hash, const char *path, bool pump)
 				hash_string_buffer(hash, inc_path, strlen(inc_path));
 			}
 
-			remember_include_file(inc_path, hash, system);
+			remember_include_file(inc_path, hash, system, NULL);
 			p = q; // Everything of interest between p and q has been hashed now.
 		} else if (q[0] == '.' && q[1] == 'i' && q[2] == 'n' && q[3] == 'c'
 		           && q[4] == 'b' && q[5] == 'i' && q[6] == 'n') {
@@ -1002,7 +1038,12 @@ process_preprocessed_file(struct hash *hash, const char *path, bool pump)
 		char *pch_path = x_strdup(included_pch_file);
 		pch_path = make_relative_path(pch_path);
 		hash_string(hash, pch_path);
-		remember_include_file(pch_path, hash, false);
+		remember_include_file(pch_path, hash, false, NULL);
+	}
+
+	bool debug_included = getenv("CCACHE_DEBUG_INCLUDED");
+	if (debug_included) {
+		print_included_files(stdout);
 	}
 
 	return true;
@@ -1086,6 +1127,46 @@ out:
 		x_unlink(tmp_file);
 	}
 	free(tmp_file);
+}
+
+// Extract the used includes from the dependency file. Note that we cannot
+// distinguish system headers from other includes here.
+static struct file_hash *
+object_hash_from_depfile(const char *depfile, struct hash *hash)
+{
+	FILE *f = fopen(depfile, "r");
+	if (!f) {
+		cc_log("Cannot open dependency file %s: %s", depfile, strerror(errno));
+		return NULL;
+	}
+
+	init_included_files_table();
+
+	char buf[10000];
+	while (fgets(buf, sizeof(buf), f) && !ferror(f)) {
+		char *saveptr;
+		char *token;
+		for (token = strtok_r(buf, " \t\n", &saveptr);
+		     token;
+		     token = strtok_r(NULL, " \t\n", &saveptr)) {
+			if (str_endswith(token, ":") || str_eq(token, "\\")) {
+				continue;
+			}
+			remember_include_file(x_strdup(token), hash, false, hash);
+		}
+	}
+
+	fclose(f);
+
+	bool debug_included = getenv("CCACHE_DEBUG_INCLUDED");
+	if (debug_included) {
+		print_included_files(stdout);
+	}
+
+	struct file_hash *result = x_malloc(sizeof(*result));
+	hash_result_as_bytes(hash, result->hash);
+	result->size = hash_input_size(hash);
+	return result;
 }
 
 // Helper method for copy_file_to_cache and move_file_to_cache_same_fs.
@@ -1283,21 +1364,33 @@ update_manifest_file(void)
 	}
 }
 
+static void
+update_cached_result_globals(struct file_hash *hash)
+{
+	char *object_name = format_hash_as_string(hash->hash, hash->size);
+	cached_obj_hash = hash;
+	cached_obj = get_path_in_cache(object_name, ".o");
+	cached_stderr = get_path_in_cache(object_name, ".stderr");
+	cached_dep = get_path_in_cache(object_name, ".d");
+	cached_cov = get_path_in_cache(object_name, ".gcno");
+	cached_su = get_path_in_cache(object_name, ".su");
+	cached_dia = get_path_in_cache(object_name, ".dia");
+	cached_dwo = get_path_in_cache(object_name, ".dwo");
+
+	stats_file = format("%s/%c/stats", conf->cache_dir, object_name[0]);
+	free(object_name);
+}
+
 // Run the real compiler and put the result in cache.
 static void
-to_fscache(struct args *args)
+to_fscache(struct args *args, struct hash *depend_mode_hash)
 {
-#ifdef HAVE_LIBMEMCACHED
-	char *data_obj, *data_stderr, *data_dia, *data_dep;
-	size_t size_obj, size_stderr, size_dia, size_dep;
-#endif
-	char *tmp_stdout = format("%s.tmp.stdout", cached_obj);
-	int tmp_stdout_fd = create_tmp_fd(&tmp_stdout);
-	char *tmp_stderr = format("%s.tmp.stderr", cached_obj);
-	int tmp_stderr_fd = create_tmp_fd(&tmp_stderr);
-
 	args_add(args, "-o");
 	args_add(args, output_obj);
+
+	if (conf->hard_link) {
+		x_unlink(output_obj);
+	}
 
 	if (generating_diagnostics) {
 		args_add(args, "--serialize-diagnostics");
@@ -1309,6 +1402,7 @@ to_fscache(struct args *args)
 	//
 	//   tmp.stdout.vexed.732.o: /home/mbp/.ccache/tmp.stdout.vexed.732.i
 	x_unsetenv("DEPENDENCIES_OUTPUT");
+	x_unsetenv("SUNPRO_DEPENDENCIES");
 
 	if (conf->run_second_cpp) {
 		args_add(args, input_file);
@@ -1317,9 +1411,38 @@ to_fscache(struct args *args)
 	}
 
 	cc_log("Running real compiler");
-	int status =
-		execute(args->argv, tmp_stdout_fd, tmp_stderr_fd, &compiler_pid);
-	args_pop(args, 3);
+	char *tmp_stdout;
+	int tmp_stdout_fd;
+	char *tmp_stderr;
+	int tmp_stderr_fd;
+	int status;
+	if (!conf->depend_mode) {
+		tmp_stdout = format("%s.tmp.stdout", cached_obj);
+		tmp_stdout_fd = create_tmp_fd(&tmp_stdout);
+		tmp_stderr = format("%s.tmp.stderr", cached_obj);
+		tmp_stderr_fd = create_tmp_fd(&tmp_stderr);
+
+		status = execute(args->argv, tmp_stdout_fd, tmp_stderr_fd, &compiler_pid);
+		args_pop(args, 3);
+	} else {
+		// The cached object path is not known yet, use temporary files.
+		tmp_stdout = format("%s/tmp.stdout", temp_dir());
+		tmp_stdout_fd = create_tmp_fd(&tmp_stdout);
+		tmp_stderr = format("%s/tmp.stderr", temp_dir());
+		tmp_stderr_fd = create_tmp_fd(&tmp_stderr);
+
+		// Use the original arguments (including dependency options) in depend
+		// mode.
+		assert(orig_args);
+		struct args *depend_mode_args = args_copy(orig_args);
+		args_strip(depend_mode_args, "--ccache-");
+		add_prefix(depend_mode_args, conf->prefix_command);
+
+		time_of_compilation = time(NULL);
+		status = execute(
+			depend_mode_args->argv, tmp_stdout_fd, tmp_stderr_fd, &compiler_pid);
+		args_free(depend_mode_args);
+	}
 
 	struct stat st;
 	if (x_stat(tmp_stdout, &st) != 0) {
@@ -1397,6 +1520,23 @@ to_fscache(struct args *args)
 		failed();
 	}
 
+	if (generating_dependencies) {
+		use_relative_paths_in_depfile(output_dep);
+	}
+
+	if (conf->depend_mode) {
+		struct file_hash *object_hash =
+			object_hash_from_depfile(output_dep, depend_mode_hash);
+		if (!object_hash) {
+			failed();
+		}
+		update_cached_result_globals(object_hash);
+
+		// It does not make sense to update an existing manifest file in the depend
+		// mode.
+		x_unlink(manifest_path);
+	}
+
 	if (stat(output_obj, &st) != 0) {
 		cc_log("Compiler didn't produce an object file");
 		stats_update(STATS_NOOUTPUT);
@@ -1413,7 +1553,11 @@ to_fscache(struct args *args)
 		failed();
 	}
 	if (st.st_size > 0) {
-		move_file_to_cache_same_fs(tmp_stderr, cached_stderr);
+		if (!conf->depend_mode) {
+			move_file_to_cache_same_fs(tmp_stderr, cached_stderr);
+		} else {
+			copy_file_to_cache(tmp_stderr, cached_stderr);
+		}
 	} else {
 		tmp_unlink(tmp_stderr);
 		if (conf->recache) {
@@ -1424,7 +1568,6 @@ to_fscache(struct args *args)
 
 	copy_file_to_cache(output_obj, cached_obj);
 	if (generating_dependencies) {
-		use_relative_paths_in_depfile(output_dep);
 		copy_file_to_cache(output_dep, cached_dep);
 	}
 	if (generating_coverage) {
@@ -1465,6 +1608,8 @@ to_fscache(struct args *args)
 	}
 
 #ifdef HAVE_LIBMEMCACHED
+	char *data_obj, *data_stderr, *data_dia, *data_dep;
+	size_t size_obj, size_stderr, size_dia, size_dep;
 	if (strlen(conf->memcached_conf) > 0 && !conf->read_only_memcached &&
 	    !using_split_dwarf && /* no support for the dwo files just yet */
 	    !generating_coverage) { /* coverage refers to local paths anyway */
@@ -1509,7 +1654,7 @@ to_fscache(struct args *args)
 #ifdef HAVE_LIBMEMCACHED
 // Run the real compiler and put the result in cache.
 static void
-to_memcached(struct args *args)
+to_memcached(struct args *args, struct hash *depend_mode_hash)
 {
 	const char *tmp_dir = temp_dir();
 	char *tmp_stdout, *tmp_stderr;
@@ -1529,6 +1674,10 @@ to_memcached(struct args *args)
 	}
 	if (using_split_dwarf) {
 		cc_log("No memcached support for split dwarf yet");
+		failed();
+	}
+	if (depend_mode_hash) {
+		cc_log("No memcached support for depend mode yet");
 		failed();
 	}
 
@@ -1756,6 +1905,7 @@ get_object_name_from_cpp(struct args *args, struct hash *hash)
 		}
 
 		path_stdout = format("%s/%s.stdout", temp_dir(), input_base);
+		free(input_base);
 		int path_stdout_fd = create_tmp_fd(&path_stdout);
 		add_pending_tmp_file(path_stdout);
 
@@ -1834,24 +1984,6 @@ get_object_name_from_cpp(struct args *args, struct hash *hash)
 	hash_result_as_bytes(hash, result->hash);
 	result->size = hash_input_size(hash);
 	return result;
-}
-
-static void
-update_cached_result_globals(struct file_hash *hash)
-{
-	char *object_name = format_hash_as_string(hash->hash, hash->size);
-	cached_key = strdup(object_name);
-	cached_obj_hash = hash;
-	cached_obj = get_path_in_cache(object_name, ".o");
-	cached_stderr = get_path_in_cache(object_name, ".stderr");
-	cached_dep = get_path_in_cache(object_name, ".d");
-	cached_cov = get_path_in_cache(object_name, ".gcno");
-	cached_su = get_path_in_cache(object_name, ".su");
-	cached_dia = get_path_in_cache(object_name, ".dia");
-	cached_dwo = get_path_in_cache(object_name, ".dwo");
-
-	stats_file = format("%s/%c/stats", conf->cache_dir, object_name[0]);
-	free(object_name);
 }
 
 // Hash mtime or content of a file, or the output of a command, according to
@@ -1971,6 +2103,25 @@ calculate_common_hash(struct args *args, struct hash *hash)
 	hash_string(hash, base);
 	free(base);
 
+	if (!(conf->sloppiness & SLOPPY_LOCALE)) {
+		// Hash environment variables that may affect localization of compiler
+		// warning messages.
+		const char *envvars[] = {
+			"LANG",
+			"LC_ALL",
+			"LC_CTYPE",
+			"LC_MESSAGES",
+			NULL
+		};
+		for (const char **p = envvars; *p; ++p) {
+			char *v = getenv(*p);
+			if (v) {
+				hash_delimiter(hash, *p);
+				hash_string(hash, v);
+			}
+		}
+	}
+
 	// Possibly hash the current working directory.
 	if (generating_debuginfo && conf->hash_dir) {
 		char *cwd = gnu_getcwd();
@@ -2022,7 +2173,8 @@ calculate_common_hash(struct args *args, struct hash *hash)
 	}
 
 	// Possibly hash the sanitize blacklist file path.
-	if (sanitize_blacklist) {
+	for (size_t i = 0; i < sanitize_blacklists_len; i++) {
+		char *sanitize_blacklist = sanitize_blacklists[i];
 		cc_log("Hashing sanitize blacklist %s", sanitize_blacklist);
 		hash_delimiter(hash, "sanitizeblacklist");
 		if (!hash_file(hash, sanitize_blacklist)) {
@@ -2100,6 +2252,12 @@ calculate_object_hash(struct args *args, struct hash *hash, int direct_mode)
 		// CCACHE_BASEDIR to reuse results across different directories. Skip it
 		// from hashing.
 		if (str_startswith(args->argv[i], "-fdebug-prefix-map=")) {
+			continue;
+		}
+		if (str_startswith(args->argv[i], "-ffile-prefix-map=")) {
+			continue;
+		}
+		if (str_startswith(args->argv[i], "-fmacro-prefix-map=")) {
 			continue;
 		}
 
@@ -2693,6 +2851,9 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 	bool dependency_filename_specified = false;
 	// Is the dependency makefile target name specified with -MT or -MQ?
 	bool dependency_target_specified = false;
+	// Is the dependency target name implicitly specified using
+	// DEPENDENCIES_OUTPUT or SUNPRO_DEPENDENCIES?
+	bool dependency_implicit_target_specified = false;
 	// expanded_args is a copy of the original arguments given to the compiler
 	// but with arguments from @file and similar constructs expanded. It's only
 	// used as a temporary data structure to loop over.
@@ -2911,11 +3072,13 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 			args_add(stripped_args, argv[i]);
 			continue;
 		}
-		if (str_startswith(argv[i], "-fdebug-prefix-map=")) {
+		if (str_startswith(argv[i], "-fdebug-prefix-map=")
+		    || str_startswith(argv[i], "-ffile-prefix-map=")) {
 			debug_prefix_maps = x_realloc(
 				debug_prefix_maps,
 				(debug_prefix_maps_len + 1) * sizeof(char *));
-			debug_prefix_maps[debug_prefix_maps_len++] = x_strdup(argv[i] + 19);
+			debug_prefix_maps[debug_prefix_maps_len++] =
+				x_strdup(&argv[i][argv[i][2] == 'f' ? 18 : 19]);
 			args_add(stripped_args, argv[i]);
 			continue;
 		}
@@ -3031,7 +3194,10 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 			continue;
 		}
 		if (str_startswith(argv[i], "-fsanitize-blacklist=")) {
-			sanitize_blacklist = x_strdup(argv[i] + 21);
+			sanitize_blacklists = x_realloc(
+				sanitize_blacklists,
+				(sanitize_blacklists_len + 1) * sizeof(char *));
+			sanitize_blacklists[sanitize_blacklists_len++] = x_strdup(argv[i] + 21);
 			args_add(stripped_args, argv[i]);
 			continue;
 		}
@@ -3234,6 +3400,18 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 			continue;
 		}
 
+		if (conf->sloppiness & SLOPPY_CLANG_INDEX_STORE
+		    && str_eq(argv[i], "-index-store-path")) {
+			// Xcode 9 or later calls Clang with this option. The given path includes
+			// a UUID that might lead to cache misses, especially when cache is
+			// shared among multiple users.
+			i++;
+			if (i <= argc - 1) {
+				cc_log("Skipping argument -index-store-path %s", argv[i]);
+			}
+			continue;
+		}
+
 		// Options taking an argument that we may want to rewrite to relative paths
 		// to get better hit rate. A secondary effect is that paths in the standard
 		// error output produced by the compiler will be normalized.
@@ -3366,6 +3544,55 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 			input_file = make_relative_path(x_strdup(argv[i]));
 		}
 	} // for
+
+	// See <http://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html>.
+	// Contrary to what the documentation seems to imply the compiler still
+	// creates object files with these defined (confirmed with GCC 8.2.1), i.e.
+	// they work as -MMD/-MD, not -MM/-M. These environment variables do nothing
+	// on Clang.
+	char *dependencies_env = getenv("DEPENDENCIES_OUTPUT");
+	bool using_sunpro_dependencies = false;
+	if (!dependencies_env) {
+		dependencies_env = getenv("SUNPRO_DEPENDENCIES");
+		using_sunpro_dependencies = true;
+	}
+	if (dependencies_env) {
+		generating_dependencies = true;
+		dependency_filename_specified = true;
+		char *saveptr = NULL;
+		char *abspath_file = strtok_r(dependencies_env, " ", &saveptr);
+
+		free(output_dep);
+		output_dep = make_relative_path(x_strdup(abspath_file));
+
+		// Specifying target object is optional.
+		char *abspath_obj = strtok_r(NULL, " ", &saveptr);
+		if (abspath_obj) {
+			// It's the "file target" form.
+
+			dependency_target_specified = true;
+			char *relpath_obj = make_relative_path(x_strdup(abspath_obj));
+			// Ensure compiler gets relative path.
+			char *relpath_both = format("%s %s", output_dep, relpath_obj);
+			if (using_sunpro_dependencies) {
+				x_setenv("SUNPRO_DEPENDENCIES", relpath_both);
+			} else {
+				x_setenv("DEPENDENCIES_OUTPUT", relpath_both);
+			}
+			free(relpath_obj);
+			free(relpath_both);
+		} else {
+			// It's the "file" form.
+
+			dependency_implicit_target_specified = true;
+			// Ensure compiler gets relative path.
+			if (using_sunpro_dependencies) {
+				x_setenv("SUNPRO_DEPENDENCIES", output_dep);
+			} else {
+				x_setenv("DEPENDENCIES_OUTPUT", output_dep);
+			}
+		}
+	}
 
 	if (found_S_opt) {
 		// Even if -gsplit-dwarf is given, the .dwo file is not generated when -S
@@ -3562,6 +3789,7 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 		}
 
 		if (!dependency_target_specified
+		    && !dependency_implicit_target_specified
 		    && !str_eq(get_extension(output_dep), ".o")) {
 			args_add(dep_args, "-MQ");
 			args_add(dep_args, output_obj);
@@ -3615,7 +3843,7 @@ cc_process_args(struct args *args, struct args **preprocessor_args,
 		args_add(*compiler_args, arch_args[i]);
 	}
 
-	// Only pass dependency arguments to the preprocesor since Intel's C++
+	// Only pass dependency arguments to the preprocessor since Intel's C++
 	// compiler doesn't produce a correct .d file when compiling preprocessed
 	// source.
 	args_extend(cpp_args, dep_args);
@@ -3766,7 +3994,12 @@ cc_reset(void)
 	free(debug_prefix_maps); debug_prefix_maps = NULL;
 	debug_prefix_maps_len = 0;
 	free(profile_dir); profile_dir = NULL;
-	free(sanitize_blacklist); sanitize_blacklist = NULL;
+	for (size_t i = 0; i < sanitize_blacklists_len; i++) {
+		free(sanitize_blacklists[i]);
+		sanitize_blacklists[i] = NULL;
+	}
+	free(sanitize_blacklists); sanitize_blacklists = NULL;
+	sanitize_blacklists_len = 0;
 	free(included_pch_file); included_pch_file = NULL;
 	args_free(orig_args); orig_args = NULL;
 	free(input_file); input_file = NULL;
@@ -3890,6 +4123,12 @@ ccache(int argc, char *argv[])
 		failed();
 	}
 
+	if (conf->depend_mode
+	    && (!generating_dependencies || !conf->run_second_cpp || conf->unify)) {
+		cc_log("Disabling depend mode");
+		conf->depend_mode = false;
+	}
+
 	cc_log("Source file: %s", input_file);
 	if (generating_dependencies) {
 		cc_log("Dependency file: %s", output_dep);
@@ -3958,46 +4197,49 @@ ccache(int argc, char *argv[])
 		failed();
 	}
 
-	// Find the hash using the preprocessed output. Also updates included_files.
-	struct hash *cpp_hash = hash_copy(common_hash);
-	init_hash_debug(
-		cpp_hash, output_obj, 'p', "PREPROCESSOR MODE", debug_text_file);
+	if (!conf->depend_mode) {
+		// Find the hash using the preprocessed output. Also updates
+		// included_files.
+		struct hash *cpp_hash = hash_copy(common_hash);
+		init_hash_debug(
+			cpp_hash, output_obj, 'p', "PREPROCESSOR MODE", debug_text_file);
 
-	object_hash = calculate_object_hash(preprocessor_args, cpp_hash, 0);
-	if (!object_hash) {
-		fatal("internal error: object hash from cpp returned NULL");
-	}
-	update_cached_result_globals(object_hash);
+		object_hash = calculate_object_hash(preprocessor_args, cpp_hash, 0);
+		if (!object_hash) {
+			fatal("internal error: object hash from cpp returned NULL");
+		}
+		update_cached_result_globals(object_hash);
 
-	if (object_hash_from_manifest
-	    && !file_hashes_equal(object_hash_from_manifest, object_hash)) {
-		// The hash from manifest differs from the hash of the preprocessor output.
-		// This could be because:
-		//
-		// - The preprocessor produces different output for the same input (not
-		//   likely).
-		// - There's a bug in ccache (maybe incorrect handling of compiler
-		//   arguments).
-		// - The user has used a different CCACHE_BASEDIR (most likely).
-		//
-		// The best thing here would probably be to remove the hash entry from the
-		// manifest. For now, we use a simpler method: just remove the manifest
-		// file.
-		cc_log("Hash from manifest doesn't match preprocessor output");
-		cc_log("Likely reason: different CCACHE_BASEDIRs used");
-		cc_log("Removing manifest as a safety measure");
-		x_unlink(manifest_path);
+		if (object_hash_from_manifest
+		    && !file_hashes_equal(object_hash_from_manifest, object_hash)) {
+			// The hash from manifest differs from the hash of the preprocessor
+			// output. This could be because:
+			//
+			// - The preprocessor produces different output for the same input (not
+			//   likely).
+			// - There's a bug in ccache (maybe incorrect handling of compiler
+			//   arguments).
+			// - The user has used a different CCACHE_BASEDIR (most likely).
+			//
+			// The best thing here would probably be to remove the hash entry from
+			// the manifest. For now, we use a simpler method: just remove the
+			// manifest file.
+			cc_log("Hash from manifest doesn't match preprocessor output");
+			cc_log("Likely reason: different CCACHE_BASEDIRs used");
+			cc_log("Removing manifest as a safety measure");
+			x_unlink(manifest_path);
 
-		put_object_in_manifest = true;
-	}
+			put_object_in_manifest = true;
+		}
 
-	/* don't hit memcached twice */
-	if (conf->memcached_only && object_hash_from_manifest
-	    && file_hashes_equal(object_hash_from_manifest, object_hash)) {
-		cc_log("Already searched for %s", cached_key);
-	} else {
-		// If we can return from cache at this point then do.
-		from_cache(FROMCACHE_CPP_MODE, put_object_in_manifest);
+		/* don't hit memcached twice */
+		if (conf->memcached_only && object_hash_from_manifest
+		    && file_hashes_equal(object_hash_from_manifest, object_hash)) {
+			cc_log("Already searched for %s", cached_key);
+		} else {
+			// If we can return from cache at this point then do.
+			from_cache(FROMCACHE_CPP_MODE, put_object_in_manifest);
+		}
 	}
 
 	if (conf->read_only) {
@@ -4007,8 +4249,11 @@ ccache(int argc, char *argv[])
 
 	add_prefix(compiler_args, conf->prefix_command);
 
+	// In depend_mode, extend the direct hash.
+	struct hash *depend_mode_hash = conf->depend_mode ? direct_hash : NULL;
+
 	// Run real compiler, sending output to cache.
-	to_cache(compiler_args);
+	to_cache(compiler_args, depend_mode_hash);
 
 	x_exit(0);
 }

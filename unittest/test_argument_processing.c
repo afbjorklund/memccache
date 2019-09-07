@@ -184,12 +184,12 @@ TEST(sysroot_should_be_rewritten_if_basedir_is_used)
 	free(conf->base_dir);
 	conf->base_dir = get_root();
 	current_working_dir = get_cwd();
-	arg_string = format("cc --sysroot=%s/foo -c foo.c", current_working_dir);
+	arg_string = format("cc --sysroot=%s/foo/bar -c foo.c", current_working_dir);
 	orig = args_init_from_string(arg_string);
 	free(arg_string);
 
 	CHECK(cc_process_args(orig, &act_cpp, &act_cc));
-	CHECK_STR_EQ(act_cpp->argv[1], "--sysroot=./foo");
+	CHECK_STR_EQ(act_cpp->argv[1], "--sysroot=./foo/bar");
 
 	args_free(orig);
 	args_free(act_cpp);
@@ -366,7 +366,7 @@ TEST(fprofile_flag_with_existing_dir_should_be_rewritten_to_real_path)
 	args_free(orig);
 }
 
-TEST(fprofile_flag_with_nonexisting_dir_should_not_be_rewritten)
+TEST(fprofile_flag_with_nonexistent_dir_should_not_be_rewritten)
 {
 	struct args *orig = args_init_from_string(
 		"gcc -c -fprofile-generate=some/dir foo.c");

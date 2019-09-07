@@ -215,13 +215,12 @@ cc_log_argv(const char *prefix, char **argv)
 }
 
 // Copy the current log memory buffer to an output file.
-bool
+void
 cc_dump_log_buffer(const char *path)
 {
 	FILE *file = fopen(path, "w");
-	fwrite(logbuffer, 1, logsize, file);
+	(void) fwrite(logbuffer, 1, logsize, file);
 	fclose(file);
-	return true;
 }
 
 // Something went badly wrong!
@@ -848,6 +847,16 @@ x_realloc(void *ptr, size_t size)
 		fatal("x_realloc: Could not allocate %lu bytes", (unsigned long)size);
 	}
 	return p2;
+}
+
+// This is like setenv.
+void x_setenv(const char *name, const char *value)
+{
+#ifdef HAVE_SETENV
+	setenv(name, value, true);
+#else
+	putenv(format("%s=%s", name, value)); // Leak to environment.
+#endif
 }
 
 // This is like unsetenv.
