@@ -55,7 +55,7 @@ confitems_hash (register const char *str, register unsigned int len)
       70, 70, 70, 70, 70, 70, 70, 70, 70, 70,
       70, 70, 70, 70, 70, 70, 70, 70, 70, 70,
       70, 70, 70, 70, 70, 70, 70, 70,  5, 20,
-       5,  0, 30, 70, 30, 10, 70, 20, 25,  0,
+       5,  0, 30,  5, 30, 10, 70, 20, 25,  0,
       10, 70,  0, 70,  0,  0, 10,  0, 70, 70,
       70, 55, 70, 70, 70, 70, 70, 70, 70, 70,
       70, 70, 70, 70, 70, 70, 70, 70, 70, 70,
@@ -87,7 +87,7 @@ confitems_get (register const char *str, register unsigned int len)
 {
   enum
     {
-      TOTAL_KEYWORDS = 34,
+      TOTAL_KEYWORDS = 36,
       MIN_WORD_LENGTH = 4,
       MAX_WORD_LENGTH = 26,
       MIN_HASH_VALUE = 5,
@@ -96,99 +96,102 @@ confitems_get (register const char *str, register unsigned int len)
 
   static const struct conf_item wordlist[] =
     {
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-      {"",0,NULL,0,NULL},
-#line 40 "src/confitems.gperf"
-      {"stats",               30, ITEM(stats, bool)},
-      {"",0,NULL,0,NULL},
-#line 37 "src/confitems.gperf"
-      {"recache",             27, ITEM(recache, bool)},
-#line 28 "src/confitems.gperf"
-      {"max_size",            18, ITEM(max_size, size)},
-#line 27 "src/confitems.gperf"
-      {"max_files",           17, ITEM(max_files, unsigned)},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+      {"",0,NULL,0,NULL,NULL},
+#line 42 "src/confitems.gperf"
+      {"stats",               32, ITEM(stats, bool)},
+      {"",0,NULL,0,NULL,NULL},
 #line 39 "src/confitems.gperf"
-      {"sloppiness",          29, ITEM(sloppiness, sloppiness)},
-      {"",0,NULL,0,NULL},
-#line 19 "src/confitems.gperf"
-      {"disable",              9, ITEM(disable, bool)},
+      {"recache",             29, ITEM(recache, bool)},
+#line 29 "src/confitems.gperf"
+      {"max_size",            19, ITEM(max_size, size)},
+#line 28 "src/confitems.gperf"
+      {"max_files",           18, ITEM(max_files, unsigned)},
+#line 41 "src/confitems.gperf"
+      {"sloppiness",          31, ITEM(sloppiness, sloppiness)},
+      {"",0,NULL,0,NULL,NULL},
+#line 20 "src/confitems.gperf"
+      {"disable",             10, ITEM(disable, bool)},
 #line 10 "src/confitems.gperf"
       {"base_dir",             0, ITEM_V(base_dir, env_string, absolute_path)},
-#line 38 "src/confitems.gperf"
-      {"run_second_cpp",      28, ITEM(run_second_cpp, bool)},
-      {"",0,NULL,0,NULL},
+#line 40 "src/confitems.gperf"
+      {"run_second_cpp",      30, ITEM(run_second_cpp, bool)},
 #line 18 "src/confitems.gperf"
-      {"direct_mode",          8, ITEM(direct_mode, bool)},
-      {"",0,NULL,0,NULL},
-#line 33 "src/confitems.gperf"
-      {"prefix_command_cpp",  23, ITEM(prefix_command_cpp, env_string)},
-#line 32 "src/confitems.gperf"
-      {"prefix_command",      22, ITEM(prefix_command, env_string)},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-      {"",0,NULL,0,NULL},
-#line 41 "src/confitems.gperf"
-      {"temporary_dir",       31, ITEM(temporary_dir, env_string)},
-#line 36 "src/confitems.gperf"
-      {"read_only_memcached", 26, ITEM(read_only_memcached, bool)},
-#line 42 "src/confitems.gperf"
-      {"umask",               32, ITEM(umask, umask)},
+      {"debug",                8, ITEM(debug, bool)},
+#line 19 "src/confitems.gperf"
+      {"direct_mode",          9, ITEM(direct_mode, bool)},
+      {"",0,NULL,0,NULL,NULL},
 #line 35 "src/confitems.gperf"
-      {"read_only_direct",    25, ITEM(read_only_direct, bool)},
-      {"",0,NULL,0,NULL},
+      {"prefix_command_cpp",  25, ITEM(prefix_command_cpp, env_string)},
+#line 34 "src/confitems.gperf"
+      {"prefix_command",      24, ITEM(prefix_command, env_string)},
+      {"",0,NULL,0,NULL,NULL},
+#line 33 "src/confitems.gperf"
+      {"pch_external_checksum", 23, ITEM(pch_external_checksum, bool)},
+      {"",0,NULL,0,NULL,NULL},
+#line 43 "src/confitems.gperf"
+      {"temporary_dir",       33, ITEM(temporary_dir, env_string)},
+#line 38 "src/confitems.gperf"
+      {"read_only_memcached", 28, ITEM(read_only_memcached, bool)},
+#line 44 "src/confitems.gperf"
+      {"umask",               34, ITEM(umask, umask)},
+#line 37 "src/confitems.gperf"
+      {"read_only_direct",    27, ITEM(read_only_direct, bool)},
+      {"",0,NULL,0,NULL,NULL},
 #line 13 "src/confitems.gperf"
       {"compiler",             3, ITEM(compiler, string)},
 #line 11 "src/confitems.gperf"
       {"cache_dir",            1, ITEM(cache_dir, env_string)},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-      {"",0,NULL,0,NULL},
-#line 26 "src/confitems.gperf"
-      {"log_file",            16, ITEM(log_file, env_string)},
-#line 31 "src/confitems.gperf"
-      {"path",                21, ITEM(path, env_string)},
-      {"",0,NULL,0,NULL},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+      {"",0,NULL,0,NULL,NULL},
+#line 27 "src/confitems.gperf"
+      {"log_file",            17, ITEM(log_file, env_string)},
+#line 32 "src/confitems.gperf"
+      {"path",                22, ITEM(path, env_string)},
+      {"",0,NULL,0,NULL,NULL},
 #line 12 "src/confitems.gperf"
       {"cache_dir_levels",     2, ITEM_V(cache_dir_levels, unsigned, dir_levels)},
-#line 24 "src/confitems.gperf"
-      {"keep_comments_cpp",   14, ITEM(keep_comments_cpp, bool)},
-#line 22 "src/confitems.gperf"
-      {"hash_dir",            12, ITEM(hash_dir, bool)},
 #line 25 "src/confitems.gperf"
-      {"limit_multiple",      15, ITEM(limit_multiple, float)},
-      {"",0,NULL,0,NULL},
+      {"keep_comments_cpp",   15, ITEM(keep_comments_cpp, bool)},
+#line 23 "src/confitems.gperf"
+      {"hash_dir",            13, ITEM(hash_dir, bool)},
+#line 26 "src/confitems.gperf"
+      {"limit_multiple",      16, ITEM(limit_multiple, float)},
+      {"",0,NULL,0,NULL,NULL},
 #line 15 "src/confitems.gperf"
       {"compression",          5, ITEM(compression, bool)},
-      {"",0,NULL,0,NULL},
+      {"",0,NULL,0,NULL,NULL},
 #line 17 "src/confitems.gperf"
       {"cpp_extension",        7, ITEM(cpp_extension, string)},
-#line 29 "src/confitems.gperf"
-      {"memcached_conf",      19, ITEM(memcached_conf, string)},
-      {"",0,NULL,0,NULL},
-#line 23 "src/confitems.gperf"
-      {"ignore_headers_in_manifest", 13, ITEM(ignore_headers_in_manifest, env_string)},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-#line 20 "src/confitems.gperf"
-      {"extra_files_to_hash", 10, ITEM(extra_files_to_hash, env_string)},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
+#line 30 "src/confitems.gperf"
+      {"memcached_conf",      20, ITEM(memcached_conf, string)},
+      {"",0,NULL,0,NULL,NULL},
+#line 24 "src/confitems.gperf"
+      {"ignore_headers_in_manifest", 14, ITEM(ignore_headers_in_manifest, env_string)},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+#line 21 "src/confitems.gperf"
+      {"extra_files_to_hash", 11, ITEM(extra_files_to_hash, env_string)},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
 #line 14 "src/confitems.gperf"
       {"compiler_check",       4, ITEM(compiler_check, string)},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-#line 21 "src/confitems.gperf"
-      {"hard_link",           11, ITEM(hard_link, bool)},
-#line 43 "src/confitems.gperf"
-      {"unify",               33, ITEM(unify, bool)},
-      {"",0,NULL,0,NULL},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+#line 22 "src/confitems.gperf"
+      {"hard_link",           12, ITEM(hard_link, bool)},
+#line 45 "src/confitems.gperf"
+      {"unify",               35, ITEM(unify, bool)},
+      {"",0,NULL,0,NULL,NULL},
 #line 16 "src/confitems.gperf"
       {"compression_level",    6, ITEM(compression_level, unsigned)},
-      {"",0,NULL,0,NULL},
-#line 34 "src/confitems.gperf"
-      {"read_only",           24, ITEM(read_only, bool)},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-      {"",0,NULL,0,NULL}, {"",0,NULL,0,NULL},
-#line 30 "src/confitems.gperf"
-      {"memcached_only",      20, ITEM(memcached_only, bool)}
+      {"",0,NULL,0,NULL,NULL},
+#line 36 "src/confitems.gperf"
+      {"read_only",           26, ITEM(read_only, bool)},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+      {"",0,NULL,0,NULL,NULL}, {"",0,NULL,0,NULL,NULL},
+#line 31 "src/confitems.gperf"
+      {"memcached_only",      21, ITEM(memcached_only, bool)}
     };
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
@@ -205,4 +208,4 @@ confitems_get (register const char *str, register unsigned int len)
     }
   return 0;
 }
-static const size_t CONFITEMS_TOTAL_KEYWORDS = 34;
+static const size_t CONFITEMS_TOTAL_KEYWORDS = 36;

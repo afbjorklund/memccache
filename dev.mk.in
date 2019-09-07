@@ -7,6 +7,8 @@ A2X = a2x
 ASCIIDOC = asciidoc
 CPPCHECK = cppcheck
 CPPCHECK_SUPPRESSIONS = misc/cppcheck-suppressions.txt
+SHELLCHECK = shellcheck
+SHELLCHECK_EXCLUDES = misc/shellcheck-excludes.txt
 SCAN_BUILD = scan-build
 DOCKER = docker
 GPERF = gperf
@@ -38,6 +40,7 @@ headers = \
     src/conf.h \
     src/counters.h \
     src/getopt_long.h \
+    src/hash.h \
     src/hashtable.h \
     src/hashtable_itr.h \
     src/hashtable_private.h \
@@ -48,6 +51,7 @@ headers = \
     src/mdfour.h \
     src/murmurhashneutral2.h \
     src/system.h \
+    src/unify.h \
     unittest/framework.h \
     unittest/util.h
 generated_headers = \
@@ -100,13 +104,14 @@ uncrustify_exclude_files = \
     src/snprintf.c
 
 ifneq ($(shell sed 's/.*"\(.*\)".*/\1/' src/version.c 2>/dev/null),$(version))
-  $(shell echo 'const char CCACHE_VERSION[] = "$(version)";' >src/version.c)
+  $(shell echo 'extern const char CCACHE_VERSION[]; const char CCACHE_VERSION[] = "$(version)";' >src/version.c)
 endif
 src/version.o: src/version.c
 
 %_lookup.c: %.gperf
-	$(GPERF) $< | awk '/#ifdef __GNUC__/ { ++i; if (i == 2) { print "static"; }} {print}' >$@
-	echo "static const size_t $$(echo $(notdir $*) | tr a-z A-Z)_TOTAL_KEYWORDS = $$(sed -nr 's/.*TOTAL_KEYWORDS = ([0-9]+).*/\1/p' $@);" >>$@
+	$(if $(quiet),@echo "  GPERF    $@")
+	$(Q)$(GPERF) $< | awk '/#ifdef __GNUC__/ { ++i; if (i == 2) { print "static"; }} {print}' >$@
+	$(Q)echo "static const size_t $$(echo $(notdir $*) | tr a-z A-Z)_TOTAL_KEYWORDS = $$(sed -nr 's/.*TOTAL_KEYWORDS = ([0-9]+).*/\1/p' $@);" >>$@
 
 .PHONY: dist
 dist: $(dist_archives)
@@ -164,16 +169,19 @@ docs: $(generated_docs)
 
 %.html: %.adoc
 	@mkdir -p $(@D)
-	$(ASCIIDOC) -o $@ -a revnumber=$(version) -a toc -b xhtml11 $<
+	$(if $(quiet),@echo "  ASCIIDOC $@")
+	$(Q)$(ASCIIDOC) -o $@ -a revnumber=$(version) -a toc -b xhtml11 $<
 
 %.xml: %.adoc
 	@mkdir -p $(@D)
 # Make literals stand out as bold in the man page:
-	$(ASCIIDOC) -a revnumber=$(version) -d manpage -b docbook -o - $< | \
+	$(if $(quiet),@echo "  ASCIIDOC $@")
+	$(Q)$(ASCIIDOC) -a revnumber=$(version) -d manpage -b docbook -o - $< | \
 	  perl -pe 's!<literal>(.*?)</literal>!<emphasis role="strong">\1</emphasis>!g' >$@
 
 doc/ccache.1: doc/MANUAL.xml
-	$(A2X) --doctype manpage --format manpage $<
+	$(if $(quiet),@echo "  A2X      $@")
+	$(Q)$(A2X) --doctype manpage --format manpage $<
 
 .PHONY: update-authors
 update-authors:
@@ -188,8 +196,12 @@ check-syntax:
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --suppressions-list=$(CPPCHECK_SUPPRESSIONS) \
-	  --inline-suppr -q --enable=all --force \
+	  --inline-suppr -q --enable=all --force -I . \
 	  $(non_3pp_sources) src/main.c $(test_sources)
+
+.PHONY: shellcheck
+shellcheck: test/suites/*.bash
+	$(SHELLCHECK) --shell=bash --exclude=$(shell sed -e 's/:.*//' <$(SHELLCHECK_EXCLUDES) | grep -v '#' | tr '\n' ',' | sed -e 's/,$$//') $^
 
 .PHONY: uncrustify
 uncrustify:

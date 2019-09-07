@@ -1,6 +1,56 @@
 ccache news
 ===========
 
+ccache 3.5
+----------
+Release date: 2018-10-15
+
+Changes
+~~~~~~~
+
+- Added a boolean `debug` (`CCACHE_DEBUG`) configuration option. When enabled,
+  ccache will create per-object debug files that are helpful e.g. when
+  debugging unexpected cache misses. See also the new ``Cache debugging''
+  section in the manual.
+
+- Renamed `CCACHE_CC` to `CCACHE_COMPILER` (keeping the former as a deprecated
+  alias).
+
+- Added a new command-line option `-k/--get-config` that prints the value of a
+  config key.
+
+- It is now possible to let ccache hash a precomputed checksum file instead of
+  the full content of a precompiled header. This can save time for large
+  precompiled headers. Note that the build system needs to keep the checksum
+  file in sync with the precompiled header for this to work.
+
+- Improved performance substantially when using `hash_dir = false` on platforms
+  like macOS where `getcwd()` is slow.
+
+- Added ``stats updated'' timestamp in `ccache -s` output. This can be useful
+  if you wonder whether ccache actually was used for your last build.
+
+- Renamed ``stats zero time'' to ``stats zeroed'' and documented it. The
+  counter is also now only present in `ccache -s` output when `ccache -z`
+  actually has been called.
+
+- The content of the `-fsanitize-blacklist` file is now included in the hash,
+  so updates to the file will now correctly result in separate cache entries.
+
+- It's now possible to opt out of building and installing man pages when
+  running `make install` in the source repository.
+
+- If the compiler type can't be detected (e.g. if it is named *cc*), use safer
+  defaults that won't trip up Clang.
+
+- Made the ccache test suite work on FreeBSD.
+
+- Added `file_stat_matches_ctime` option to disable ctime check if
+  `file_stat_matches` is enabled.
+
+- Made “./configure --without-bundled-zlib” do what’s intended.
+
+
 ccache 3.4.3
 -----------
 Release date: 2018-09-02
@@ -11,11 +61,11 @@ Bug fixes
 - Fixed a race condition when creating the initial config file in the cache
   directory.
 
-- Bail out on too hard clang option `-MJ`.
+- Bail out on too hard Clang option `-MJ`.
 
 - Bail out on too hard option `-save-temps=obj`.
 
-- Handle separate parameter to clang option `-target` correctly.
+- Handle separate parameter to Clang option `-target` correctly.
 
 - Upgraded bundled zlib to version 1.2.11.
 

@@ -8,10 +8,6 @@ addons:
             - zlib1g-dev
             - libmemcached-dev
             - memcached
-            - mingw32
-            - mingw32-binutils
-            - clang    # scan-build
-            - lib32z1-dev
 
 os:
     - linux
@@ -35,6 +31,7 @@ matrix:
               apt:
                   packages:
                       - gcc-multilib
+                      - lib32z1-dev
         - os: linux
           compiler: i686-w64-mingw32-gcc
           env: HOST="--host=i686-w64-mingw32" TEST="unittest/run.exe"
@@ -55,6 +52,7 @@ matrix:
               apt:
                   packages:
                       - clang    # scan-build
+                      - gperf
         - os: linux
           compiler: gcc
           env: CUDA=8.0.61-1

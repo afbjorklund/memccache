@@ -168,7 +168,7 @@
 #include <config.h>
 #endif	/* HAVE_CONFIG_H */
 
-#if TEST_SNPRINTF
+#ifdef TEST_SNPRINTF
 #include <math.h>	/* For pow(3), NAN, and INFINITY. */
 #include <string.h>	/* For strcmp(3). */
 #if defined(__NetBSD__) || \
@@ -1202,7 +1202,7 @@ again:
 	 * Factor of ten with the number of digits needed for the fractional
 	 * part.  For example, if the precision is 3, the mask will be 1000.
 	 */
-	mask = mypow10(precision);
+	mask = (UINTMAX_T)mypow10(precision);
 	/*
 	 * We "cheat" by converting the fractional part to integer by
 	 * multiplying by a factor of ten.
@@ -1454,7 +1454,7 @@ cast(LDOUBLE value)
 	if (value >= UINTMAX_MAX)
 		return UINTMAX_MAX;
 
-	result = value;
+	result = (UINTMAX_T)value;
 	/*
 	 * At least on NetBSD/sparc64 3.0.2 and 4.99.30, casting long double to
 	 * an integer type converts e.g. 1.9 to 2 instead of 1 (which violates
@@ -1574,7 +1574,7 @@ rpl_asprintf(va_alist) va_dcl
 int main(void);
 #endif	/* !HAVE_SNPRINTF || !HAVE_VSNPRINTF || !HAVE_ASPRINTF || [...] */
 
-#if TEST_SNPRINTF
+#ifdef TEST_SNPRINTF
 int
 main(void)
 {

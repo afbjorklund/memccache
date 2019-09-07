@@ -1,4 +1,5 @@
 #include "ccache.h"
+#include "mdfour.h"
 
 #ifdef HAVE_LIBMEMCACHED
 
