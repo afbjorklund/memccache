@@ -1319,7 +1319,7 @@ put_data_in_cache(void *data, size_t size, const char *dest)
 		failed();
 	}
 	cc_log("Stored in cache: %zu bytes -> %s", size, dest);
-	stats_update_size(size, 1);
+	stats_update_size(stats_file, size, 1);
 }
 #endif
 
@@ -2572,7 +2572,7 @@ calculate_object_hash(struct args *args, struct hash *hash, int direct_mode)
 			if (cache) {
 				cc_log("Added object file hash to %s", manifest_path);
 				write_file(data, manifest_path, size);
-				stats_update_size(size, 1);
+				stats_update_size(stats_file, size, 1);
 				free(cache);
 			} else
 #endif
