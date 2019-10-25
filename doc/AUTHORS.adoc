@@ -20,9 +20,11 @@ ccache is a collective work with contributions from many people, including:
 * Chiaki Ishikawa
 * Chris AtLee
 * Clemens Rabe
+* Cristian Adam
 * David Givone
 * Doug Anderson
 * Edward Z. Yang
+* Erik Johansson
 * Francois Marier
 * Gabriel Scherer
 * Geert Bosch
@@ -31,6 +33,7 @@ ccache is a collective work with contributions from many people, including:
 * Havard Graff
 * Hongli Lai
 * Ivan Vaigult
+* Ivan Volnov
 * Jiang Jiang
 * Joel Galenson
 * Joel Rosdahl
@@ -47,7 +50,9 @@ ccache is a collective work with contributions from many people, including:
 * Lalit Chhabra
 * Lars Gustäbel
 * Leanid Chaika
+* Loïc Yhuel
 * Luboš Luňák
+* luzpaz
 * Maarten Maathuis
 * Mark Starovoytov
 * Martin Ettl
@@ -59,6 +64,7 @@ ccache is a collective work with contributions from many people, including:
 * Michael Meeks
 * Michał Mirosław
 * Mihai Serban
+* Mike Blumenkrantz
 * Mike Frysinger
 * Mike Gulick
 * Mikhail Kolomeytsev

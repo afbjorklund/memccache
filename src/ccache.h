@@ -243,7 +243,7 @@ unsigned stats_get_pending(enum stats stat);
 void stats_zero(void);
 void stats_summary(void);
 void stats_print(void);
-void stats_update_size(int64_t size, int files);
+void stats_update_size(const char *sfile, int64_t size, int files);
 void stats_get_obsolete_limits(const char *dir, unsigned *maxfiles,
                                uint64_t *maxsize);
 void stats_set_sizes(const char *dir, unsigned num_files, uint64_t total_size);
@@ -289,8 +289,10 @@ extern time_t time_of_compilation;
 extern bool output_is_precompiled_header;
 void block_signals(void);
 void unblock_signals(void);
-bool cc_process_args(struct args *args, struct args **preprocessor_args,
-                    struct args **compiler_args);
+bool cc_process_args(struct args *args,
+                     struct args **preprocessor_args,
+                     struct args **extra_args_to_hash,
+                     struct args **compiler_args);
 void cc_reset(void);
 bool is_precompiled_header(const char *path);
 
@@ -308,7 +310,7 @@ typedef int (*COMPAR_FN_T)(const void *, const void *);
 #endif
 
 #ifdef _WIN32
-char *win32argvtos(char *prefix, char **argv);
+char *win32argvtos(char *prefix, char **argv, int *length);
 char *win32getshell(char *path);
 int win32execute(char *path, char **argv, int doreturn,
                  int fd_stdout, int fd_stderr);

@@ -439,6 +439,37 @@ EOF
     rm -f third_name.d
 
     # -------------------------------------------------------------------------
+    TEST "MF /dev/null"
+
+    $CCACHE_COMPILE -c -MD -MF /dev/null test.c
+    expect_stat 'cache hit (direct)' 0
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 1
+    expect_stat 'files in cache' 2 # .o + .manifest
+
+    $CCACHE_COMPILE -c -MD -MF /dev/null test.c
+    expect_stat 'cache hit (direct)' 1
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 1
+    expect_stat 'files in cache' 2
+
+    $CCACHE_COMPILE -c -MD -MF test.d test.c
+    expect_stat 'cache hit (direct)' 1
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 2
+    expect_stat 'files in cache' 5
+    expect_equal_files test.d expected.d
+
+    rm -f test.d
+
+    $CCACHE_COMPILE -c -MD -MF test.d test.c
+    expect_stat 'cache hit (direct)' 2
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 2
+    expect_stat 'files in cache' 5
+    expect_equal_files test.d expected.d
+
+    # -------------------------------------------------------------------------
     TEST "Missing .d file"
 
     $CCACHE_COMPILE -c -MD test.c

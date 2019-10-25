@@ -80,7 +80,7 @@ out:
 static bool
 parse_line(const char *line, char **key, char **value, char **errmsg)
 {
-#define SKIP_WS(x) while (isspace(*x)) { ++x; }
+#define SKIP_WS(x) do { while (isspace(*x)) { ++x; } } while (false)
 
 	*key = NULL;
 	*value = NULL;
@@ -196,7 +196,7 @@ conf_free(struct conf *conf)
 
 // Note: The path pointer is stored in conf, so path must outlive conf.
 //
-// On failure, if an I/O error occured errno is set appropriately, otherwise
+// On failure, if an I/O error occurred errno is set appropriately, otherwise
 // errno is set to zero indicating that config itself was invalid.
 bool
 conf_read(struct conf *conf, const char *path, char **errmsg)
@@ -301,6 +301,12 @@ conf_set_value_in_file(const char *path, const char *key, const char *value,
 	const struct conf_item *item = find_conf(key);
 	if (!item) {
 		*errmsg = format("unknown configuration option \"%s\"", key);
+		return false;
+	}
+
+	char dummy[8] = {0}; // The maximum entry size in struct conf.
+	if (!item->parser(value, (void *)dummy, errmsg)
+	    || (item->verifier && !item->verifier(value, errmsg))) {
 		return false;
 	}
 

@@ -57,22 +57,20 @@ else
     CFLAGS="$CFLAGS -O"
 fi
 
-more_warnings="-Wextra -Wpedantic"
-if test "$ac_compiler_clang" = yes; then
-    more_warnings="$more_warnings -Weverything"
-    more_warnings="$more_warnings -Wno-conversion"
-    more_warnings="$more_warnings -Wno-disabled-macro-expansion"
-    more_warnings="$more_warnings -Wno-format-nonliteral"
-    more_warnings="$more_warnings -Wno-padded"
-    more_warnings="$more_warnings -Wno-shorten-64-to-32"
-    more_warnings="$more_warnings -Wno-sign-conversion"
-fi
-
 AC_ARG_ENABLE(more_warnings,
   [AS_HELP_STRING([--enable-more-warnings],
     [enable more compiler warnings])])
 if test x${enable_more_warnings} = xyes; then
-    CFLAGS="$CFLAGS $more_warnings"
+    more_warnings="-Wextra -Wpedantic"
+    if test "$ac_compiler_clang" = yes; then
+        more_warnings="$more_warnings -Weverything"
+        more_warnings="$more_warnings -Wno-conversion"
+        more_warnings="$more_warnings -Wno-disabled-macro-expansion"
+        more_warnings="$more_warnings -Wno-format-nonliteral"
+        more_warnings="$more_warnings -Wno-padded"
+        more_warnings="$more_warnings -Wno-shorten-64-to-32"
+        more_warnings="$more_warnings -Wno-sign-conversion"
+    fi
 fi
 
 AC_HEADER_DIRENT
@@ -234,11 +232,12 @@ fi
 mkdir -p .deps src unittest
 
 dnl Enable developer mode if dev.mk.in exists.
-if test ! -f $srcdir/dev_mode_disabled && test "$RUN_FROM_BUILD_FARM" != yes; then
+if test ! -f $srcdir/dev_mode_disabled; then
     AC_MSG_NOTICE(developer mode enabled)
     AC_CONFIG_FILES([dev.mk])
     include_dev_mk='include dev.mk'
     version=`(git --git-dir=$srcdir/.git describe --dirty 2>/dev/null || echo vunknown) | sed -e 's/v//' -e 's/-/+/' -e 's/-/_/g'`
+    mkdir -p src
     echo "extern const char CCACHE_VERSION@<:@@:>@; const char CCACHE_VERSION@<:@@:>@ = \"$version\";" >src/version.c
     AC_CHECK_TOOL(GPERF, gperf)
     if test -z "$GPERF"; then

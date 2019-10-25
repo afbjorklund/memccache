@@ -1,5 +1,5 @@
 // Copyright (C) 2002 Andrew Tridgell
-// Copyright (C) 2011-2018 Joel Rosdahl
+// Copyright (C) 2011-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -26,7 +26,7 @@ find_executable_in_path(const char *name, const char *exclude_name, char *path);
 // Re-create a win32 command line string based on **argv.
 // http://msdn.microsoft.com/en-us/library/17w5ykft.aspx
 char *
-win32argvtos(char *prefix, char **argv)
+win32argvtos(char *prefix, char **argv, int *length)
 {
 	int i = 0;
 	int k = 0;
@@ -52,6 +52,7 @@ win32argvtos(char *prefix, char **argv)
 	char *ptr = malloc(k + 1);
 	char *str = ptr;
 	if (!str) {
+		*length = 0;
 		return NULL;
 	}
 
@@ -83,6 +84,7 @@ win32argvtos(char *prefix, char **argv)
 	} while ((arg = argv[i++]));
 	ptr[-1] = '\0';
 
+	*length = ptr - str - 1;
 	return str;
 }
 
@@ -162,13 +164,31 @@ win32execute(char *path, char **argv, int doreturn,
 		}
 	}
 
-	char *args = win32argvtos(sh, argv);
+	int length;
+	char *args = win32argvtos(sh, argv, &length);
 	const char *ext = strrchr(path, '.');
 	char full_path_win_ext[MAX_PATH] = {0};
 	add_exe_ext_if_no_to_fullpath(full_path_win_ext, MAX_PATH, ext, path);
-	BOOL ret =
-		CreateProcess(full_path_win_ext, args, NULL, NULL, 1, 0, NULL, NULL,
-		              &si, &pi);
+	BOOL ret = FALSE;
+	if (length > 8192) {
+		char *tmp_file = format("%s.tmp", path);
+		FILE *fp = create_tmp_file(&tmp_file, "w");
+		char atfile[MAX_PATH + 3];
+		fwrite(args, 1, length, fp);
+		if (ferror(fp)) {
+			cc_log("Error writing @file; this command will probably fail: %s", args);
+		}
+		fclose(fp);
+		snprintf(atfile, sizeof(atfile), "\"@%s\"", tmp_file);
+		ret = CreateProcess(NULL, atfile, NULL, NULL, 1, 0, NULL, NULL,
+		                    &si, &pi);
+		tmp_unlink(tmp_file);
+		free(tmp_file);
+	}
+	if (!ret) {
+		ret = CreateProcess(full_path_win_ext, args, NULL, NULL, 1, 0, NULL, NULL,
+		                    &si, &pi);
+	}
 	if (fd_stdout != -1) {
 		close(fd_stdout);
 		close(fd_stderr);

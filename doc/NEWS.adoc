@@ -1,6 +1,121 @@
 ccache news
 ===========
 
+ccache 3.7.5
+------------
+Release date: 2019-10-22
+
+New features
+~~~~~~~~~~~~
+
+- Added support for `-MF=arg` (with an extra equal sign) as understood by
+  EDG-based compilers.
+
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed a regression in 3.7.2 that could result in a warning message instead of
+  an error in an edge case related to usage of “-Werror”.
+
+- An implicit `-MQ` is now passed to the preprocessor only if the object file
+  extension is non-standard. This will make it easier to use EDG-based
+  compilers (e.g. GHS) which don’t understand `-MQ`. (This is a bug fix of the
+  corresponding improvement implemented in ccache 3.4.)
+
+- ccache now falls back to running the real compiler instead of failing fataly
+  if an internal temporary file is missing after compilation.
+
+- Fixed a crash if localtime returns null pointer in localtime_r replacement.
+
+- Fixed header file dependency tracking when building ccache itself.
+
+- Fixed warning during configure in out-of-tree build in developer mode.
+
+
+ccache 3.7.4
+------------
+Release date: 2019-09-12
+
+Improvements
+~~~~~~~~~~~~
+
+- Added support for GCC 9’s `-gz[=type]` option (previously ccache would think
+  that “-gz” alone would enable debug information, thus potentially including
+  the current directory in the hash).
+
+- Added support for converting paths like “/c/users” into relative paths on
+  Windows.
+
+
+ccache 3.7.3
+------------
+Release date: 2019-08-17
+
+Bug fixes
+~~~~~~~~~
+
+- The cache size (which is counted in “used disk blocks”) is now correct on
+  filesystems that use more or less disk blocks than conventional filesystems,
+  e.g. ecryptfs or btrfs/zfs with transparent compression. This also fixes a
+  related problem with ccache's own test suite when run on such file systems.
+
+- Fixed a regression in 3.7.2 when using the compiler option “-Werror” and then
+  “-Wno-error” later on the command line.
+
+
+ccache 3.7.2
+------------
+Release date: 2019-07-19
+
+Bug fixes
+~~~~~~~~~
+
+- The compiler option `-gdwarf*` no longer forces “run_second_cpp = true”.
+
+- Added verification that the value passed to the `-o/--set-config` option is
+  valid.
+
+- Fixed detection of precompiled headers in the depend mode.
+
+- Bail out on too hard Clang option `-ftime-trace`.
+
+- ccache now updates the correct stats file when adding/updating manifest
+  files. This bug previously made the file and size statistics counters
+  incorrect over time.
+
+- Fixed warnings from Clang about unused arguments during preprocessing.
+
+- Unknown manifest versions are now handled gracefully in `--dump-manifest`.
+
+- Fixed `make check` with “funny” locales.
+
+
+Documentation
+~~~~~~~~~~~~~
+
+- Added a hint about not running `autogen.sh` when building from a release
+  archive.
+
+- Mention that `xsltproc` is needed when building from the source repository.
+
+
+ccache 3.7.1
+------------
+Release date: 2019-05-01
+
+Changes
+~~~~~~~
+
+- Fixed a problem when using the compiler option `-MF /dev/null`.
+
+- Long commandlines are now handled gracefully on Windows by using the `@file`
+  syntax to avoid hitting the commandline size limit.
+
+- Fixed complaint from GCC 9’s `-Werror=format-overflow` when compiling ccache
+  itself.
+
+
 ccache 3.7
 ----------
 Release date: 2019-04-23
@@ -18,7 +133,7 @@ Changes
 
 - Compilations with /dev/null as the input file are now cached.
 
-- ccache has learned how to contruct the object filename if no `-o` option is
+- ccache has learned how to construct the object filename if no `-o` option is
   given and the source filename does not include a `.` or ends with a `.`.
 
 - Fixed a temporary file leak when the depend mode is enabled and the compiler
