@@ -1445,6 +1445,7 @@ static void
 update_cached_result_globals(struct file_hash *hash)
 {
 	char *object_name = format_hash_as_string(hash->hash, hash->size);
+	cached_key = strdup(object_name);
 	cached_obj_hash = hash;
 	cached_obj = get_path_in_cache(object_name, ".o");
 	cached_stderr = get_path_in_cache(object_name, ".stderr");
