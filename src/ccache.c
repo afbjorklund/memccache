@@ -2556,7 +2556,6 @@ calculate_object_hash(struct args *args, struct hash *hash, int direct_mode)
 		manifest_path = get_path_in_cache(manifest_name, ".manifest");
 		manifest_stats_file =
 			format("%s/%c/stats", conf->cache_dir, manifest_name[0]);
-		free(manifest_name);
 		/* Check if the manifest file is there. */
 		struct stat st;
 		if (stat(manifest_path, &st) != 0) {
