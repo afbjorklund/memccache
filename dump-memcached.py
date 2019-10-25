@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import memcache
+from pymemcache.client.base import Client
+from pymemcache.client.hash import HashClient
 import struct
 import sys
 import os
@@ -48,7 +49,21 @@ MEMCCACHE_BIG = 'CCBM'
 MEMCCACHE_BIG = 'CCBM'
 
 server = os.getenv("MEMCACHED_SERVERS", "localhost")
-mc = memcache.Client(server.split(','), debug=1)
+if ',' in server:
+    servers = []
+    for s in server.split(','):
+        if ':' in s:
+            servers.append(tuple(s.split(':')))
+        else:
+            servers.append((s, 11211))
+    mc = HashClient(servers)
+else:
+    s = server
+    if ':' in s:
+        server = tuple(s.split(':'))
+    else:
+        server = (s, 11211)
+    mc = Client(server)
 
 key = sys.argv[1]
 val = mc.get(key)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import memcache
+from pymemcache.client.base import Client
+from pymemcache.client.hash import HashClient
 import struct
 import os
 import hashlib
@@ -50,7 +51,21 @@ MAX_VALUE_SIZE = 1000 << 10 # 1M with memcached overhead
 SPLIT_VALUE_SIZE = MAX_VALUE_SIZE
 
 server = os.getenv("MEMCACHED_SERVERS", "localhost")
-mc = memcache.Client(server.split(','), debug=1)
+if ',' in server:
+    servers = []
+    for s in server.split(','):
+        if ':' in s:
+            servers.append(tuple(s.split(':')))
+        else:
+            servers.append((s, 11211))
+    mc = HashClient(servers)
+else:
+    s = server
+    if ':' in s:
+        server = tuple(s.split(':'))
+    else:
+        server = (s, 11211)
+    mc = Client(server)
 
 ccache = os.getenv("CCACHE_DIR", os.path.expanduser("~/.ccache"))
 filelist = []
