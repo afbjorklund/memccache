@@ -1,5 +1,5 @@
 // Copyright (C) 2002 Andrew Tridgell
-// Copyright (C) 2009-2019 Joel Rosdahl
+// Copyright (C) 2009-2020 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -97,12 +97,11 @@ log_prefix(bool log_updated_time)
 		struct tm tm;
 		struct timeval tv;
 		gettimeofday(&tv, NULL);
-#ifdef __MINGW64_VERSION_MAJOR
-		localtime_r((time_t *)&tv.tv_sec, &tm);
-#else
-		localtime_r(&tv.tv_sec, &tm);
-#endif
-		strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", &tm);
+		if (localtime_r((time_t *)&tv.tv_sec, &tm) != NULL) {
+			strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", &tm);
+		} else {
+			snprintf(timestamp, sizeof(timestamp), "%lu", tv.tv_sec);
+		}
 		snprintf(prefix, sizeof(prefix),
 		         "[%s.%06d %-5d] ", timestamp, (int)tv.tv_usec, (int)getpid());
 	}
@@ -1194,7 +1193,7 @@ static BOOL GetFileNameFromHandle(HANDLE file_handle, TCHAR *filename,
 								           TEXT("%s%s"),
 								           drive,
 								           filename+name_len);
-								_tcsncpy(filename, temp_file, _tcslen(temp_file));
+								strcpy(filename, temp_file);
 							}
 						}
 					}
@@ -1588,9 +1587,8 @@ x_rename(const char *oldpath, const char *newpath)
 	return rename(oldpath, newpath);
 #else
 	// Windows' rename() refuses to overwrite an existing file.
-	unlink(newpath); // Not x_unlink, as x_unlink calls x_rename.
 	// If the function succeeds, the return value is nonzero.
-	if (MoveFileA(oldpath, newpath) == 0) {
+	if (MoveFileExA(oldpath, newpath, MOVEFILE_REPLACE_EXISTING) == 0) {
 		LPVOID lp_msg_buf;
 		DWORD dw = GetLastError();
 		FormatMessage(
