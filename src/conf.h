@@ -40,7 +40,6 @@ struct conf {
 	bool stats;
 	char *temporary_dir;
 	unsigned umask;
-	bool unify;
 
 	const char **item_origins;
 };

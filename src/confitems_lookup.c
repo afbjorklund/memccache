@@ -1,4 +1,4 @@
-/* ANSI-C code produced by gperf version 3.0.4 */
+/* ANSI-C code produced by gperf version 3.1 */
 /* Command-line: gperf  */
 /* Computed positions: -k'1-2,11' */
 
@@ -26,7 +26,7 @@
       && ('w' == 119) && ('x' == 120) && ('y' == 121) && ('z' == 122) \
       && ('{' == 123) && ('|' == 124) && ('}' == 125) && ('~' == 126))
 /* The character set is not based on ISO-646.  */
-#warning "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gnu-gperf@gnu.org>."
+#warning "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
 #endif
 
 #include "confitems.h"
@@ -64,10 +64,10 @@ confitems_hash (register const char *str, register size_t len)
       95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
       95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
       95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
-      95, 95, 95, 95, 95, 35, 95, 20,  5, 20,
-       0,  0, 95,  0, 35, 10, 95,  0, 25,  0,
-      10, 25,  0, 95,  0, 10,  0,  5, 95, 95,
-      15, 95, 95, 95, 95, 95, 95, 95, 95, 95,
+      95, 95, 95, 95, 95, 30, 95, 20,  5, 20,
+       0,  0, 95,  0, 35, 10, 95,  5, 25,  0,
+       0, 25,  0, 95,  0,  5,  0, 10, 95, 95,
+      20, 95, 95, 95, 95, 95, 95, 95, 95, 95,
       95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
       95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
       95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
@@ -82,7 +82,7 @@ confitems_hash (register const char *str, register size_t len)
       95, 95, 95, 95, 95, 95, 95, 95, 95, 95,
       95, 95, 95, 95, 95, 95
     };
-  register int hval = len;
+  register unsigned int hval = len;
 
   switch (hval)
     {
@@ -112,7 +112,7 @@ confitems_get (register const char *str, register size_t len)
 {
   enum
     {
-      TOTAL_KEYWORDS = 37,
+      TOTAL_KEYWORDS = 36,
       MIN_WORD_LENGTH = 4,
       MAX_WORD_LENGTH = 26,
       MIN_HASH_VALUE = 5,
@@ -129,22 +129,23 @@ confitems_get (register const char *str, register size_t len)
       {"recache",                    30, ITEM(recache, bool)},
       {"",0,0,NULL,NULL,NULL},
       {"read_only",                  27, ITEM(read_only, bool)},
-      {"umask",                      35, ITEM(umask, umask)},
+      {"stats",                      33, ITEM(stats, bool)},
       {"depend_mode",                9, ITEM(depend_mode, bool)},
       {"",0,0,NULL,NULL,NULL},
       {"temporary_dir",              34, ITEM(temporary_dir, env_string)},
       {"prefix_command",             25, ITEM(prefix_command, env_string)},
-      {"stats",                      33, ITEM(stats, bool)},
+      {"umask",                      35, ITEM(umask, umask)},
       {"read_only_direct",           28, ITEM(read_only_direct, bool)},
       {"disable",                    11, ITEM(disable, bool)},
       {"prefix_command_cpp",         26, ITEM(prefix_command_cpp, env_string)},
       {"read_only_memcached",        29, ITEM(read_only_memcached, bool)},
-      {"unify",                      36, ITEM(unify, bool)},
+      {"",0,0,NULL,NULL,NULL},
       {"direct_mode",                10, ITEM(direct_mode, bool)},
-      {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
+      {"keep_comments_cpp",          16, ITEM(keep_comments_cpp, bool)},
+      {"",0,0,NULL,NULL,NULL},
       {"path",                       23, ITEM(path, env_string)},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
-      {"keep_comments_cpp",          16, ITEM(keep_comments_cpp, bool)},
+      {"",0,0,NULL,NULL,NULL},
       {"max_size",                   20, ITEM(max_size, size)},
       {"max_files",                  19, ITEM(max_files, unsigned)},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
@@ -155,33 +156,31 @@ confitems_get (register const char *str, register size_t len)
       {"ignore_headers_in_manifest", 15, ITEM(ignore_headers_in_manifest, env_string)},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
       {"memcached_only",             22, ITEM(memcached_only, bool)},
-      {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
-      {"",0,0,NULL,NULL,NULL},
-      {"cpp_extension",              7, ITEM(cpp_extension, string)},
-      {"extra_files_to_hash",        12, ITEM(extra_files_to_hash, env_string)},
       {"sloppiness",                 32, ITEM(sloppiness, sloppiness)},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
-      {"",0,0,NULL,NULL,NULL},
+      {"cpp_extension",              7, ITEM(cpp_extension, string)},
+      {"extra_files_to_hash",        12, ITEM(extra_files_to_hash, env_string)},
+      {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
+      {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
       {"cache_dir",                  1, ITEM(cache_dir, env_string)},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
       {"",0,0,NULL,NULL,NULL},
       {"compiler",                   3, ITEM(compiler, string)},
       {"run_second_cpp",             31, ITEM(run_second_cpp, bool)},
-      {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
+      {"",0,0,NULL,NULL,NULL},
+      {"compression",                5, ITEM(compression, bool)},
       {"",0,0,NULL,NULL,NULL},
       {"log_file",                   18, ITEM(log_file, env_string)},
       {"limit_multiple",             17, ITEM(limit_multiple, double)},
       {"",0,0,NULL,NULL,NULL},
       {"pch_external_checksum",      24, ITEM(pch_external_checksum, bool)},
-      {"",0,0,NULL,NULL,NULL},
+      {"compression_level",          6, ITEM(compression_level, unsigned)},
       {"hash_dir",                   14, ITEM(hash_dir, bool)},
       {"hard_link",                  13, ITEM(hard_link, bool)},
-      {"",0,0,NULL,NULL,NULL},
-      {"compression",                5, ITEM(compression, bool)},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
-      {"",0,0,NULL,NULL,NULL},
-      {"compression_level",          6, ITEM(compression_level, unsigned)},
+      {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
+      {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
       {"",0,0,NULL,NULL,NULL}, {"",0,0,NULL,NULL,NULL},
@@ -198,9 +197,9 @@ confitems_get (register const char *str, register size_t len)
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
     {
-      register int key = confitems_hash (str, len);
+      register unsigned int key = confitems_hash (str, len);
 
-      if (key <= MAX_HASH_VALUE && key >= 0)
+      if (key <= MAX_HASH_VALUE)
         {
           register const char *s = wordlist[key].name;
 
@@ -210,4 +209,4 @@ confitems_get (register const char *str, register size_t len)
     }
   return 0;
 }
-size_t confitems_count(void) { return 37; }
+size_t confitems_count(void) { return 36; }

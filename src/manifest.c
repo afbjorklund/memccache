@@ -1,4 +1,4 @@
-// Copyright (C) 2009-2018 Joel Rosdahl
+// Copyright (C) 2009-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -493,7 +493,8 @@ get_file_hash_index(struct manifest *mf,
                     char *path,
                     struct file_hash *file_hash,
                     struct hashtable *mf_files,
-                    struct hashtable *mf_file_infos)
+                    struct hashtable *mf_file_infos,
+                    bool save_timestamp)
 {
 	struct file_info fi;
 	fi.index = get_include_file_index(mf, path, mf_files);
@@ -506,9 +507,13 @@ get_file_hash_index(struct manifest *mf,
 	//
 	// st->ctime may be 0, so we have to check time_of_compilation against
 	// MAX(mtime, ctime).
+	//
+	// ccache only reads mtime/ctime if file_stat_match sloppiness is enabled, so
+	// mtimes/ctimes are stored as a dummy value (-1) if not enabled. This reduces
+	// the number of file_info entries for the common case.
 
 	struct stat file_stat;
-	if (stat(path, &file_stat) != -1
+	if (save_timestamp && stat(path, &file_stat) != -1
 	    && time_of_compilation > MAX(file_stat.st_mtime, file_stat.st_ctime)) {
 		fi.mtime = file_stat.st_mtime;
 		fi.ctime = file_stat.st_ctime;
@@ -531,7 +536,8 @@ get_file_hash_index(struct manifest *mf,
 
 static void
 add_file_info_indexes(uint32_t *indexes, uint32_t size,
-                      struct manifest *mf, struct hashtable *included_files)
+                      struct manifest *mf, struct hashtable *included_files,
+                      bool save_timestamp)
 {
 	if (size == 0) {
 		return;
@@ -549,7 +555,7 @@ add_file_info_indexes(uint32_t *indexes, uint32_t size,
 		char *path = hashtable_iterator_key(iter);
 		struct file_hash *file_hash = hashtable_iterator_value(iter);
 		indexes[i] = get_file_hash_index(mf, path, file_hash, mf_files,
-		                                 mf_file_infos);
+		                                 mf_file_infos, save_timestamp);
 		i++;
 	} while (hashtable_iterator_advance(iter));
 	assert(i == size);
@@ -561,7 +567,8 @@ add_file_info_indexes(uint32_t *indexes, uint32_t size,
 static void
 add_object_entry(struct manifest *mf,
                  struct file_hash *object_hash,
-                 struct hashtable *included_files)
+                 struct hashtable *included_files,
+                 bool save_timestamp)
 {
 	uint32_t n_objs = mf->n_objects;
 	mf->objects = x_realloc(mf->objects, (n_objs + 1) * sizeof(*mf->objects));
@@ -571,7 +578,8 @@ add_object_entry(struct manifest *mf,
 	uint32_t n_fii = hashtable_count(included_files);
 	obj->n_file_info_indexes = n_fii;
 	obj->file_info_indexes = x_malloc(n_fii * sizeof(*obj->file_info_indexes));
-	add_file_info_indexes(obj->file_info_indexes, n_fii, mf, included_files);
+	add_file_info_indexes(obj->file_info_indexes, n_fii, mf, included_files,
+	                      save_timestamp);
 	memcpy(obj->hash.hash, object_hash->hash, mf->hash_size);
 	obj->hash.size = object_hash->size;
 }
@@ -640,7 +648,7 @@ out:
 // Returns true on success, otherwise false.
 bool
 manifest_put(const char *manifest_path, struct file_hash *object_hash,
-             struct hashtable *included_files)
+             struct hashtable *included_files, bool save_timestamp)
 {
 	int ret = 0;
 	gzFile f2 = NULL;
@@ -707,7 +715,7 @@ manifest_put(const char *manifest_path, struct file_hash *object_hash,
 		goto out;
 	}
 
-	add_object_entry(mf, object_hash, included_files);
+	add_object_entry(mf, object_hash, included_files, save_timestamp);
 	if (write_manifest(f2, mf)) {
 		gzclose(f2);
 		f2 = NULL;

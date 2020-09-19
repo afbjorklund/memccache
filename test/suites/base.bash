@@ -435,22 +435,6 @@ base_tests() {
     expect_stat 'cache miss' 1
 
     # -------------------------------------------------------------------------
-    TEST "CCACHE_UNIFY"
-
-    echo '// a silly comment' >>test1.c
-    CCACHE_UNIFY=1 $CCACHE_COMPILE -c test1.c
-    expect_stat 'cache hit (preprocessed)' 0
-    expect_stat 'cache miss' 1
-
-    echo '// another silly comment' >>test1.c
-    CCACHE_UNIFY=1 $CCACHE_COMPILE -c test1.c
-    expect_stat 'cache hit (preprocessed)' 1
-    expect_stat 'cache miss' 1
-
-    $REAL_COMPILER -c -o reference_test1.o test1.c
-    expect_equal_object_files reference_test1.o test1.o
-
-    # -------------------------------------------------------------------------
     TEST "CCACHE_NLEVELS"
 
     CCACHE_NLEVELS=4 $CCACHE_COMPILE -c test1.c
@@ -1001,6 +985,20 @@ EOF
     expect_stat 'files in cache' 2
 
     # -------------------------------------------------------------------------
+    TEST "Dependency file content"
+
+    mkdir build
+    cp test1.c build
+
+    for src in test1.c build/test1.c; do
+        for obj in test1.o build/test1.o; do
+            $CCACHE_COMPILE -c -MMD $src -o $obj
+            dep=$(echo $obj | sed 's/\.o$/.d/')
+            expect_file_content $dep "$obj: $src"
+        done
+    done
+
+    # -------------------------------------------------------------------------
     TEST "Buggy GCC 6 cpp"
 
     cat >buggy-cpp <<EOF
@@ -1076,16 +1074,27 @@ EOF
     fi
 
     # -------------------------------------------------------------------------
+if ! $HOST_OS_WINDOWS; then
     TEST ".incbin"
 
     cat <<EOF >incbin.c
-char x[] = ".incbin";
+__asm__(".incbin \"/dev/null\"");
 EOF
 
     $CCACHE_COMPILE -c incbin.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 0
     expect_stat 'unsupported code directive' 1
+
+    cat <<EOF >incbin.s
+.incbin "/dev/null";
+EOF
+
+    $CCACHE_COMPILE -c incbin.s
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 0
+    expect_stat 'unsupported code directive' 2
+fi
 
     # -------------------------------------------------------------------------
     TEST "UNCACHED_ERR_FD"

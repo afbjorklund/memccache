@@ -522,9 +522,13 @@ CCACHE_MEMCACHED_CONF=--SERVER=localhost:11211
 *read_only* (*CCACHE_READONLY* or *CCACHE_NOREADONLY*, see <<_boolean_values,Boolean values>> above)::
 
     If true, ccache will attempt to use existing cached object files, but it
-    will not to try to add anything new to the cache. If you are using this
-    because your ccache directory is read-only, then you need to set
-    *temporary_dir* as otherwise ccache will fail to create temporary files.
+    will not add new results to the cache. Statistics counters will still be
+    updated, though, unless the *stats* option is set to *false*.
++
+If you are using this because your ccache directory is read-only, you need to
+set *temporary_dir* since ccache will fail to create temporary files otherwise.
+You may also want to set *stats = false* to make ccache not even try to update
+stats files.
 
 *read_only_direct* (*CCACHE_READONLY_DIRECT* or *CCACHE_NOREADONLY_DIRECT*, see <<_boolean_values,Boolean values>> above)::
 
@@ -628,18 +632,6 @@ NOTE: In previous versions of ccache, *CCACHE_TEMPDIR* had to be on the same
     as the compiler). This is mostly useful when you wish to share your cache
     with other users. Note that this also affects the file permissions set on
     the object files created from your compilations.
-
-*unify* (*CCACHE_UNIFY* or *CCACHE_NOUNIFY*, see <<_boolean_values,Boolean values>> above)::
-
-    If true, ccache will use a C/C++ unifier when hashing the preprocessor
-    output if the *-g* option is not used. The unifier is slower than a normal
-    hash, so setting this environment variable loses a little bit of speed, but
-    it means that ccache can take advantage of not recompiling when the changes
-    to the source code consist of reformatting only. Note that enabling the
-    unifier changes the hash, so cached compilations produced when the unifier
-    is enabled cannot be reused when the unifier is disabled, and vice versa.
-    Enabling the unifier may result in incorrect line number information in
-    compiler warning messages and expansions of the `__LINE__` macro.
 
 
 Cache size management
@@ -954,7 +946,6 @@ The depend mode will be disabled if any of the following holds:
 
 * the configuration setting *depend_mode* is false
 * the configuration setting *run_second_cpp* is false
-* the configuration setting *unify* is true
 * the compiler is not generating dependencies using *-MD* or *-MMD*
 
 

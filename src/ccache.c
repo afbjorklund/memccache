@@ -1,7 +1,7 @@
 // ccache -- a fast C/C++ compiler cache
 //
 // Copyright (C) 2002-2007 Andrew Tridgell
-// Copyright (C) 2009-2019 Joel Rosdahl
+// Copyright (C) 2009-2020 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -30,7 +30,6 @@
 #include "hashutil.h"
 #include "language.h"
 #include "manifest.h"
-#include "unify.h"
 
 #define STRINGIFY(x) #x
 #define TO_STRING(x) STRINGIFY(x)
@@ -47,7 +46,7 @@ static const char VERSION_TEXT[] =
 	MYNAME " version %s\n"
 	"\n"
 	"Copyright (C) 2002-2007 Andrew Tridgell\n"
-	"Copyright (C) 2009-2019 Joel Rosdahl\n"
+	"Copyright (C) 2009-2020 Joel Rosdahl\n"
 	"\n"
 	"This program is free software; you can redistribute it and/or modify it under\n"
 	"the terms of the GNU General Public License as published by the Free Software\n"
@@ -617,6 +616,7 @@ get_current_working_dir(void)
 		if (!current_working_dir) {
 			cc_log("Unable to determine current working directory: %s",
 			       strerror(errno));
+			stats_update(STATS_ERROR);
 			failed();
 		}
 	}
@@ -1434,8 +1434,15 @@ update_manifest_file(void)
 		old_size = file_size(&st);
 	}
 
+	// See comment in get_file_hash_index for why saving of timestamps is forced
+	// for precompiled headers.
+	bool save_timestamp =
+		(conf->sloppiness & SLOPPY_FILE_STAT_MATCHES)
+		|| output_is_precompiled_header;
+
 	MTR_BEGIN("manifest", "manifest_put");
-	if (manifest_put(manifest_path, cached_obj_hash, included_files)) {
+	if (manifest_put(manifest_path, cached_obj_hash, included_files,
+	                 save_timestamp)) {
 		cc_log("Added object file hash to %s", manifest_path);
 		if (x_stat(manifest_path, &st) == 0) {
 			stats_update_size(
@@ -1569,18 +1576,21 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 		if (x_rename(tmp_stderr, tmp_stderr2)) {
 			cc_log("Failed to rename %s to %s: %s", tmp_stderr, tmp_stderr2,
 			       strerror(errno));
+			stats_update(STATS_ERROR);
 			failed();
 		}
 
 		int fd_cpp_stderr = open(cpp_stderr, O_RDONLY | O_BINARY);
 		if (fd_cpp_stderr == -1) {
 			cc_log("Failed opening %s: %s", cpp_stderr, strerror(errno));
+			stats_update(STATS_ERROR);
 			failed();
 		}
 
 		int fd_real_stderr = open(tmp_stderr2, O_RDONLY | O_BINARY);
 		if (fd_real_stderr == -1) {
 			cc_log("Failed opening %s: %s", tmp_stderr2, strerror(errno));
+			stats_update(STATS_ERROR);
 			failed();
 		}
 
@@ -1588,6 +1598,7 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 			open(tmp_stderr, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0666);
 		if (fd_result == -1) {
 			cc_log("Failed opening %s: %s", tmp_stderr, strerror(errno));
+			stats_update(STATS_ERROR);
 			failed();
 		}
 
@@ -1622,6 +1633,7 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 		struct file_hash *object_hash =
 			object_hash_from_depfile(output_dep, depend_mode_hash);
 		if (!object_hash) {
+			stats_update(STATS_ERROR);
 			failed();
 		}
 		update_cached_result_globals(object_hash);
@@ -1684,7 +1696,7 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 
 	MTR_END("file", "file_put");
 
-	stats_update(STATS_TOCACHE);
+	stats_update(STATS_CACHEMISS);
 
 	// Make sure we have a CACHEDIR.TAG in the cache part of cache_dir. This can
 	// be done almost anywhere, but we might as well do it near the end as we
@@ -1942,7 +1954,7 @@ to_memcached(struct args *args, struct hash *depend_mode_hash)
 
 	cc_log("Storing %s in memcached", cached_key);
 
-	stats_update(STATS_TOCACHE);
+	stats_update(STATS_CACHEMISS);
 
 	/* Make sure we have a CACHEDIR.TAG in the cache part of cache_dir. This can
 	 * be done almost anywhere, but we might as well do it near the end as we
@@ -2035,27 +2047,11 @@ get_object_name_from_cpp(struct args *args, struct hash *hash)
 		failed();
 	}
 
-	if (conf->unify) {
-		// When we are doing the unifying tricks we need to include the input file
-		// name in the hash to get the warnings right.
-		hash_delimiter(hash, "unifyfilename");
-		hash_string(hash, input_file);
-
-		hash_delimiter(hash, "unifycpp");
-
-		bool debug_unify = getenv("CCACHE_DEBUG_UNIFY");
-		if (unify_hash(hash, path_stdout, debug_unify) != 0) {
-			stats_update(STATS_ERROR);
-			cc_log("Failed to unify %s", path_stdout);
-			failed();
-		}
-	} else {
-		hash_delimiter(hash, "cpp");
-		if (!process_preprocessed_file(hash, path_stdout,
-		                               guessed_compiler == GUESSED_PUMP)) {
-			stats_update(STATS_ERROR);
-			failed();
-		}
+	hash_delimiter(hash, "cpp");
+	if (!process_preprocessed_file(hash, path_stdout,
+	                               guessed_compiler == GUESSED_PUMP)) {
+		stats_update(STATS_ERROR);
+		failed();
 	}
 
 	hash_delimiter(hash, "cppstderr");
@@ -2571,6 +2567,7 @@ calculate_object_hash(struct args *args, struct hash *hash, int direct_mode)
 		hash_delimiter(hash, "sourcecode");
 		int result = hash_source_code_file(conf, hash, input_file);
 		if (result & HASH_SOURCE_CODE_ERROR) {
+			stats_update(STATS_ERROR);
 			failed();
 		}
 		if (result & HASH_SOURCE_CODE_FOUND_TIME) {
@@ -3060,6 +3057,7 @@ cc_process_args(struct args *args,
 			i++;
 			if (i == argc) {
 				cc_log("--ccache-skip lacks an argument");
+				stats_update(STATS_ARGS);
 				result = false;
 				goto out;
 			}
@@ -3566,6 +3564,7 @@ cc_process_args(struct args *args,
 				// know what the user means, and what the compiler will do.
 				if (arg_profile_dir && profile_dir) {
 					cc_log("Profile directory already set; giving up");
+					stats_update(STATS_UNSUPPORTED_OPTION);
 					result = false;
 					goto out;
 				} else if (arg_profile_dir) {
@@ -3760,11 +3759,6 @@ cc_process_args(struct args *args,
 			input_file = make_relative_path(x_strdup(argv[i]));
 		}
 	} // for
-
-	if (generating_debuginfo && conf->unify) {
-		cc_log("Generating debug info; disabling unify mode");
-		conf->unify = false;
-	}
 
 	if (generating_debuginfo_level_3 && !conf->run_second_cpp) {
 		cc_log("Generating debug info level 3; not compiling preprocessed code");
@@ -4028,8 +4022,7 @@ cc_process_args(struct args *args,
 		}
 
 		if (!dependency_target_specified
-		    && !dependency_implicit_target_specified
-		    && !str_eq(get_extension(output_obj), ".o")) {
+		    && !dependency_implicit_target_specified) {
 			args_add(dep_args, "-MQ");
 			args_add(dep_args, output_obj);
 		}
@@ -4385,6 +4378,7 @@ set_up_uncached_err(void)
 	int uncached_fd = dup(2); // The file descriptor is intentionally leaked.
 	if (uncached_fd == -1) {
 		cc_log("dup(2) failed: %s", strerror(errno));
+		stats_update(STATS_ERROR);
 		failed();
 	}
 
@@ -4392,6 +4386,7 @@ set_up_uncached_err(void)
 	char *buf = format("UNCACHED_ERR_FD=%d", uncached_fd);
 	if (putenv(buf) == -1) {
 		cc_log("putenv failed: %s", strerror(errno));
+		stats_update(STATS_ERROR);
 		failed();
 	}
 }
@@ -4435,6 +4430,7 @@ ccache(int argc, char *argv[])
 
 	if (conf->disable) {
 		cc_log("ccache is disabled");
+		stats_update(STATS_CACHEMISS); // Dummy to trigger stats_flush.
 		failed();
 	}
 
@@ -4462,13 +4458,13 @@ ccache(int argc, char *argv[])
 	MTR_BEGIN("main", "process_args");
 	if (!cc_process_args(
 	      orig_args, &preprocessor_args, &extra_args_to_hash, &compiler_args)) {
-		failed();
+		failed(); // stats_update is called in cc_process_args.
 	}
 	MTR_END("main", "process_args");
 
 	if (conf->depend_mode
 	    && (!generating_dependencies || str_eq(output_dep, "/dev/null")
-	        || !conf->run_second_cpp || conf->unify)) {
+	        || !conf->run_second_cpp)) {
 		cc_log("Disabling depend mode");
 		conf->depend_mode = false;
 	}
@@ -4550,6 +4546,7 @@ ccache(int argc, char *argv[])
 
 	if (conf->read_only_direct) {
 		cc_log("Read-only direct mode; running real compiler");
+		stats_update(STATS_CACHEMISS);
 		failed();
 	}
 
@@ -4602,6 +4599,7 @@ ccache(int argc, char *argv[])
 
 	if (conf->read_only) {
 		cc_log("Read-only mode; running real compiler");
+		stats_update(STATS_CACHEMISS);
 		failed();
 	}
 
