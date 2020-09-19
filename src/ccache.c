@@ -2532,7 +2532,7 @@ calculate_object_hash(struct args *args, struct args *preprocessor_args,
 		if ((str_eq(args->argv[i], "-ccbin")
 		     || str_eq(args->argv[i], "--compiler-bindir"))
 		    && i + 1 < args->argc
-		    && x_stat(args->argv[i+1], &st) == 0) {
+		    && stat(args->argv[i+1], &st) == 0) {
 			found_ccbin = true;
 			hash_delimiter(hash, "ccbin");
 			hash_nvcc_host_compiler(hash, &st, args->argv[i+1]);
@@ -3081,7 +3081,10 @@ process_profiling_option(const char *arg)
 		         || str_startswith(arg, "-fauto-profile=")) {
 		new_profile_use = true;
 		new_profile_path = x_strdup(strchr(arg, '=') + 1);
-	} else if (str_eq(arg, "-fprofile-sample-accurate")) {
+	} else if (str_eq(arg, "-fprofile-correction")
+	           || str_eq(arg, "-fprofile-reorder-functions")
+	           || str_eq(arg, "-fprofile-sample-accurate")
+	           || str_eq(arg, "-fprofile-values")) {
 		return true;
 	} else {
 		cc_log("Unknown profiling option: %s", arg);
@@ -3311,7 +3314,8 @@ cc_process_args(struct args *args,
 		// Handle options that should not be passed to the preprocessor.
 		if (compopt_affects_comp(argv[i])) {
 			args_add(compiler_only_args, argv[i]);
-			if (compopt_takes_arg(argv[i])) {
+			if (compopt_takes_arg(argv[i])
+			    || (guessed_compiler == GUESSED_NVCC && str_eq(argv[i], "-Werror"))) {
 				if (i == argc - 1) {
 					cc_log("Missing argument to %s", argv[i]);
 					stats_update(STATS_ARGS);
@@ -3351,6 +3355,17 @@ cc_process_args(struct args *args,
 		if (str_eq(argv[i], "-S")) {
 			args_add(common_args, argv[i]);
 			found_S_opt = true;
+			continue;
+		}
+
+		if (strlen(argv[i]) >= 3
+		    && str_startswith(argv[i], "-x")
+		    && !islower(argv[i][2])) {
+			// -xCODE (where CODE can be e.g. Host or CORE-AVX2, always starting with
+			// an uppercase letter) is an ordinary Intel compiler option, not a
+			// language specification. (GCC's "-x" language argument is always
+			// lowercase.)
+			args_add(common_args, argv[i]);
 			continue;
 		}
 
