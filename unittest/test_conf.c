@@ -138,7 +138,7 @@ TEST(conf_read_valid_config)
 		"read_only_memcached = false\n"
 		"recache = true\n"
 		"run_second_cpp = false\n"
-		"sloppiness =     file_macro   ,time_macros,  include_file_mtime,include_file_ctime,file_stat_matches,file_stat_matches_ctime,pch_defines ,  no_system_headers,system_headers,clang_index_store\n"
+		"sloppiness =     time_macros   ,include_file_mtime  include_file_ctime,file_stat_matches,file_stat_matches_ctime,pch_defines ,  no_system_headers,system_headers,clang_index_store\n"
 		"stats = false\n"
 		"temporary_dir = ${USER}_foo\n"
 		"umask = 777\n"
@@ -184,7 +184,6 @@ TEST(conf_read_valid_config)
 	CHECK_INT_EQ(
 		SLOPPY_INCLUDE_FILE_MTIME
 		|SLOPPY_INCLUDE_FILE_CTIME
-		|SLOPPY_FILE_MACRO
 		|SLOPPY_TIME_MACROS
 		|SLOPPY_FILE_STAT_MATCHES
 		|SLOPPY_FILE_STAT_MATCHES_CTIME
@@ -276,15 +275,13 @@ TEST(conf_read_invalid_size)
 	conf_free(conf);
 }
 
-TEST(conf_read_invalid_sloppiness)
+TEST(conf_read_unknown_sloppiness)
 {
 	struct conf *conf = conf_create();
 	char *errmsg;
-	create_file("ccache.conf", "sloppiness = file_macro, foo");
-	CHECK(!conf_read(conf, "ccache.conf", &errmsg));
-	CHECK_INT_EQ(errno, 0);
-	CHECK_STR_EQ_FREE2("ccache.conf:1: unknown sloppiness: \"foo\"",
-	                   errmsg);
+	create_file("ccache.conf", "sloppiness = time_macros, foo");
+	CHECK(conf_read(conf, "ccache.conf", &errmsg));
+	CHECK_INT_EQ(conf->sloppiness, SLOPPY_TIME_MACROS);
 	conf_free(conf);
 }
 
@@ -378,7 +375,8 @@ TEST(conf_set_new_value)
 	char *data;
 
 	create_file("ccache.conf", "path = vanilla\n");
-	CHECKM(conf_set_value_in_file("ccache.conf", "compiler", "chocolate", &errmsg),
+	CHECKM(conf_set_value_in_file("ccache.conf", "compiler", "chocolate",
+	                              &errmsg),
 	       errmsg);
 	data = read_text_file("ccache.conf", 0);
 	CHECK(data);
@@ -411,6 +409,19 @@ TEST(conf_set_unknown_option)
 	data = read_text_file("ccache.conf", 0);
 	CHECK(data);
 	CHECK_STR_EQ_FREE2("path = chocolate\nstats = chocolate\n", data);
+}
+
+TEST(conf_set_unknown_sloppiness)
+{
+	char *errmsg;
+	char *data;
+
+	create_file("ccache.conf", "path = vanilla\n");
+	CHECK(conf_set_value_in_file("ccache.conf", "sloppiness", "foo", &errmsg));
+
+	data = read_text_file("ccache.conf", 0);
+	CHECK(data);
+	CHECK_STR_EQ_FREE2("path = vanilla\nsloppiness = foo\n", data);
 }
 
 TEST(conf_print_existing_value)
@@ -493,7 +504,7 @@ TEST(conf_print_items)
 		false,
 		true,
 		.run_second_cpp = false,
-		SLOPPY_FILE_MACRO|SLOPPY_INCLUDE_FILE_MTIME|
+		SLOPPY_INCLUDE_FILE_MTIME|
 		SLOPPY_INCLUDE_FILE_CTIME|SLOPPY_TIME_MACROS|
 		SLOPPY_FILE_STAT_MATCHES|SLOPPY_FILE_STAT_MATCHES_CTIME|
 		SLOPPY_PCH_DEFINES|SLOPPY_SYSTEM_HEADERS|SLOPPY_CLANG_INDEX_STORE,
@@ -549,7 +560,7 @@ TEST(conf_print_items)
 	CHECK_STR_EQ("read_only_memcached = false", received_conf_items[n++].descr);
 	CHECK_STR_EQ("recache = true", received_conf_items[n++].descr);
 	CHECK_STR_EQ("run_second_cpp = false", received_conf_items[n++].descr);
-	CHECK_STR_EQ("sloppiness = file_macro, include_file_mtime,"
+	CHECK_STR_EQ("sloppiness = include_file_mtime,"
 	             " include_file_ctime, time_macros, pch_defines,"
 	             " file_stat_matches, file_stat_matches_ctime, system_headers,"
 	             " clang_index_store",

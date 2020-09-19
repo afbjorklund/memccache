@@ -20,7 +20,7 @@
 static char *
 format_string(const void *value)
 {
-	const char * const *str = (const char * const*)value;
+	const char *const *str = (const char *const *)value;
 	return x_strdup(*str);
 }
 
@@ -110,6 +110,8 @@ confitem_format_size(const void *value)
 bool
 confitem_parse_sloppiness(const char *str, void *result, char **errmsg)
 {
+	(void)errmsg;
+
 	unsigned *value = (unsigned *)result;
 	if (!str) {
 		return *value;
@@ -120,9 +122,7 @@ confitem_parse_sloppiness(const char *str, void *result, char **errmsg)
 	char *word;
 	char *saveptr = NULL;
 	while ((word = strtok_r(q, ", ", &saveptr))) {
-		if (str_eq(word, "file_macro")) {
-			*value |= SLOPPY_FILE_MACRO;
-		} else if (str_eq(word, "file_stat_matches")) {
+		if (str_eq(word, "file_stat_matches")) {
 			*value |= SLOPPY_FILE_STAT_MATCHES;
 		} else if (str_eq(word, "file_stat_matches_ctime")) {
 			*value |= SLOPPY_FILE_STAT_MATCHES_CTIME;
@@ -141,11 +141,8 @@ confitem_parse_sloppiness(const char *str, void *result, char **errmsg)
 			*value |= SLOPPY_CLANG_INDEX_STORE;
 		} else if (str_eq(word, "locale")) {
 			*value |= SLOPPY_LOCALE;
-		} else {
-			*errmsg = format("unknown sloppiness: \"%s\"", word);
-			free(p);
-			return false;
 		}
+		// else: ignore unknown value for forward compatibility
 		q = NULL;
 	}
 	free(p);
@@ -157,9 +154,6 @@ confitem_format_sloppiness(const void *value)
 {
 	const unsigned *sloppiness = (const unsigned *)value;
 	char *s = x_strdup("");
-	if (*sloppiness & SLOPPY_FILE_MACRO) {
-		reformat(&s, "%sfile_macro, ", s);
-	}
 	if (*sloppiness & SLOPPY_INCLUDE_FILE_MTIME) {
 		reformat(&s, "%sinclude_file_mtime, ", s);
 	}
@@ -268,7 +262,7 @@ confitem_format_unsigned(const void *value)
 bool
 confitem_verify_absolute_path(const void *value, char **errmsg)
 {
-	const char * const *path = (const char * const *)value;
+	const char *const *path = (const char *const *)value;
 	assert(*path);
 	if (str_eq(*path, "")) {
 		// The empty string means "disable" in this case.
