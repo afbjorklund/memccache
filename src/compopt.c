@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2019 Joel Rosdahl
+// Copyright (C) 2010-2020 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -37,7 +37,7 @@
 // run_second_cpp is false.
 #define AFFECTS_CPP      (1 << 5)
 
-// The option only affects compilation; not passed to the preprocesor.
+// The option only affects compilation; not passed to the preprocessor.
 #define AFFECTS_COMP (1 << 6)
 
 struct compopt {

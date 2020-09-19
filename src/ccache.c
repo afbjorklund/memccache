@@ -228,9 +228,6 @@ static size_t debug_prefix_maps_len = 0;
 // Is the compiler being asked to output coverage data (.gcda) at runtime?
 static bool profile_arcs;
 
-// Name of the custom profile directory (default: object dirname).
-static char *profile_dir;
-
 // The name of the temporary preprocessed file.
 static char *i_tmpfile;
 
@@ -255,7 +252,7 @@ bool output_is_precompiled_header = false;
 enum guessed_compiler guessed_compiler = GUESSED_UNKNOWN;
 
 // Profile generation / usage information.
-static char *profile_dir = NULL;
+static char *profile_path = NULL; // directory (GCC/Clang) or file (Clang)
 static bool profile_use = false;
 static bool profile_generate = false;
 
@@ -1235,9 +1232,10 @@ object_hash_from_depfile(const char *depfile, struct hash *hash)
 	return result;
 }
 
-// Helper function for copy_file_to_cache and move_file_to_cache_same_fs.
+// Helper function for put_file_in_cache and move_file_to_cache_same_fs.
 static void
-do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy)
+do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy,
+                              bool attempt_link)
 {
 	assert(!conf->read_only);
 	assert(!conf->read_only_direct);
@@ -1246,7 +1244,7 @@ do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy)
 	bool orig_dest_existed = stat(dest, &orig_dest_st) == 0;
 	int compression_level = conf->compression ? conf->compression_level : 0;
 	bool do_move = !copy && !conf->compression;
-	bool do_link = copy && conf->hard_link && !conf->compression;
+	bool do_link = attempt_link && copy && conf->hard_link && !conf->compression;
 
 	if (do_move) {
 		move_uncompressed_file(source, dest, compression_level);
@@ -1254,6 +1252,10 @@ do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy)
 		if (do_link) {
 			x_unlink(dest);
 			int ret = link(source, dest);
+			if (ret != 0 && errno == ENOENT) {
+				create_parent_dirs(dest);
+				ret = link(source, dest);
+			}
 			if (ret != 0) {
 				cc_log("Failed to link %s to %s: %s", source, dest, strerror(errno));
 				cc_log("Falling back to copying");
@@ -1261,7 +1263,7 @@ do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy)
 			}
 		}
 		if (!do_link) {
-			int ret = copy_file(source, dest, compression_level);
+			int ret = copy_file(source, dest, compression_level, true);
 			if (ret != 0) {
 				cc_log("Failed to copy %s to %s: %s", source, dest, strerror(errno));
 				stats_update(STATS_ERROR);
@@ -1291,7 +1293,7 @@ do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy)
 		orig_dest_existed ? 0 : 1);
 }
 
-// Copy a file into the cache.
+// Copy or link a file into the cache.
 //
 // dest must be a path in the cache (see get_path_in_cache). source does not
 // have to be on the same file system as dest.
@@ -1300,9 +1302,19 @@ do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy)
 // true and conf->compression is false, otherwise copy. dest will be compressed
 // if conf->compression is true.
 static void
+put_file_in_cache(const char *source, const char *dest)
+{
+	do_copy_or_move_file_to_cache(source, dest, true, true);
+}
+
+// Copy a file to the cache.
+//
+// dest must be a path in the cache (see get_path_in_cache). source does not
+// have to be on the same file system as dest.
+static void
 copy_file_to_cache(const char *source, const char *dest)
 {
-	do_copy_or_move_file_to_cache(source, dest, true);
+	do_copy_or_move_file_to_cache(source, dest, true, false);
 }
 
 // Move a file into the cache.
@@ -1313,7 +1325,7 @@ copy_file_to_cache(const char *source, const char *dest)
 static void
 move_file_to_cache_same_fs(const char *source, const char *dest)
 {
-	do_copy_or_move_file_to_cache(source, dest, false);
+	do_copy_or_move_file_to_cache(source, dest, false, true);
 }
 
 #ifdef HAVE_LIBMEMCACHED
@@ -1353,7 +1365,7 @@ do_copy_or_link_file_from_cache(const char *source, const char *dest, bool copy)
 		x_unlink(dest);
 		ret = link(source, dest);
 	} else {
-		ret = copy_file(source, dest, 0);
+		ret = copy_file(source, dest, 0, false);
 	}
 
 	if (ret == -1) {
@@ -1526,8 +1538,11 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 	if (!conf->depend_mode) {
 		tmp_stdout = format("%s.tmp.stdout", cached_obj);
 		tmp_stdout_fd = create_tmp_fd(&tmp_stdout);
+		add_pending_tmp_file(tmp_stdout);
+
 		tmp_stderr = format("%s.tmp.stderr", cached_obj);
 		tmp_stderr_fd = create_tmp_fd(&tmp_stderr);
+		add_pending_tmp_file(tmp_stderr);
 
 		status = execute(args->argv, tmp_stdout_fd, tmp_stderr_fd, &compiler_pid);
 		args_pop(args, 3);
@@ -1535,8 +1550,11 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 		// The cached object path is not known yet, use temporary files.
 		tmp_stdout = format("%s/tmp.stdout", temp_dir());
 		tmp_stdout_fd = create_tmp_fd(&tmp_stdout);
+		add_pending_tmp_file(tmp_stdout);
+
 		tmp_stderr = format("%s/tmp.stderr", temp_dir());
 		tmp_stderr_fd = create_tmp_fd(&tmp_stderr);
+		add_pending_tmp_file(tmp_stderr);
 
 		// Use the original arguments (including dependency options) in depend
 		// mode.
@@ -1671,7 +1689,7 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 		if (!conf->depend_mode) {
 			move_file_to_cache_same_fs(tmp_stderr, cached_stderr);
 		} else {
-			copy_file_to_cache(tmp_stderr, cached_stderr);
+			put_file_in_cache(tmp_stderr, cached_stderr);
 		}
 	} else if (conf->recache) {
 		// If recaching, we need to remove any previous .stderr.
@@ -1683,7 +1701,7 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 
 	MTR_BEGIN("file", "file_put");
 
-	copy_file_to_cache(output_obj, cached_obj);
+	put_file_in_cache(output_obj, cached_obj);
 	if (produce_dep_file) {
 		copy_file_to_cache(output_dep, cached_dep);
 	}
@@ -2269,8 +2287,8 @@ calculate_common_hash(struct args *args, struct hash *hash)
 	// Possibly hash the coverage data file path.
 	if (generating_coverage && profile_arcs) {
 		char *dir = dirname(output_obj);
-		if (profile_dir) {
-			dir = x_strdup(profile_dir);
+		if (profile_path) {
+			dir = x_strdup(profile_path);
 		} else {
 			char *real_dir = x_realpath(dir);
 			free(dir);
@@ -2325,6 +2343,51 @@ calculate_common_hash(struct args *args, struct hash *hash)
 			hash_string(hash, gcc_colors);
 		}
 	}
+}
+
+static bool
+hash_profile_data_file(const char *path, struct hash *hash)
+{
+	assert(path);
+
+	char *base_name = remove_extension(output_obj);
+	char *hashified_cwd = get_cwd();
+	for (char *p = hashified_cwd; *p; ++p) {
+		if (*p == '/') {
+			*p = '#';
+		}
+	}
+	char *paths_to_try[] = {
+		// -fprofile-use[=dir]/-fbranch-probabilities (GCC <9)
+		format("%s/%s.gcda", path, base_name),
+		// -fprofile-use[=dir]/-fbranch-probabilities (GCC >=9)
+		format("%s/%s#%s.gcda", path, hashified_cwd, base_name),
+		// -fprofile(-instr|-sample)-use=file (Clang), -fauto-profile=file (GCC >=5)
+		x_strdup(path),
+		// -fprofile(-instr|-sample)-use=dir (Clang)
+		format("%s/default.profdata", path),
+		// -fauto-profile (GCC >=5)
+		x_strdup("fbdata.afdo"), // -fprofile-dir is not used
+		NULL
+	};
+	free(hashified_cwd);
+	free(base_name);
+
+	bool found = false;
+	for (char **p = paths_to_try; *p; ++p) {
+		cc_log("Checking for profile data file %s", *p);
+		struct stat st;
+		if (stat(*p, &st) == 0 && !S_ISDIR(st.st_mode)) {
+			cc_log("Adding profile data %s to the hash", *p);
+			hash_delimiter(hash, "-fprofile-use");
+			if (hash_file(hash, *p)) {
+				found = true;
+			}
+		}
+		free(*p);
+	}
+
+	return found;
 }
 
 // Update a hash sum with information specific to the direct and preprocessor
@@ -2497,39 +2560,26 @@ calculate_object_hash(struct args *args, struct args *preprocessor_args,
 		hash_nvcc_host_compiler(hash, NULL, NULL);
 	}
 
-	// For profile generation (-fprofile-arcs, -fprofile-generate):
-	// - hash profile directory
+	// For profile generation (-fprofile(-instr)-generate[=path])
+	// - hash profile path
 	//
-	// For profile usage (-fprofile-use):
+	// For profile usage (-fprofile(-instr|-sample)-use, -fbranch-probabilities):
 	// - hash profile data
 	//
-	// -fbranch-probabilities and -fvpt usage is covered by
-	// -fprofile-generate/-fprofile-use.
-	//
 	// The profile directory can be specified as an argument to
-	// -fprofile-generate=, -fprofile-use= or -fprofile-dir=.
+	// -fprofile(-instr)-generate=, -fprofile(-instr|-sample)-use= or
+	// --fprofile-dir=.
 	if (profile_generate) {
-		if (!profile_dir) {
-			profile_dir = get_cwd();
-		}
-		cc_log("Adding profile directory %s to our hash", profile_dir);
+		assert(profile_path);
+		cc_log("Adding profile directory %s to our hash", profile_path);
 		hash_delimiter(hash, "-fprofile-dir");
-		hash_string(hash, profile_dir);
+		hash_string(hash, profile_path);
 	}
 
-	if (profile_use) {
-		// Calculate gcda name.
-		if (!profile_dir) {
-			profile_dir = get_cwd();
-		}
-		char *base_name = remove_extension(output_obj);
-		char *gcda_name = format("%s/%s.gcda", profile_dir, base_name);
-		cc_log("Adding profile data %s to our hash", gcda_name);
-		// Add the gcda to our hash.
-		hash_delimiter(hash, "-fprofile-use");
-		hash_file(hash, gcda_name);
-		free(base_name);
-		free(gcda_name);
+	if (profile_use && !hash_profile_data_file(profile_path, hash)) {
+		cc_log("No profile data file found");
+		stats_update(STATS_NOINPUT);
+		failed();
 	}
 
 	// Adding -arch to hash since cpp output is affected.
@@ -2734,7 +2784,7 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 	if (!str_eq(output_obj, "/dev/null")) {
 		get_file_from_cache(cached_obj, output_obj);
 		if (using_split_dwarf) {
-			get_file_from_cache(cached_dwo, output_dwo);
+			copy_file_from_cache(cached_dwo, output_dwo);
 		}
 	}
 	if (produce_dep_file) {
@@ -2743,13 +2793,13 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 		copy_file_from_cache(cached_dep, output_dep);
 	}
 	if (generating_coverage) {
-		get_file_from_cache(cached_cov, output_cov);
+		copy_file_from_cache(cached_cov, output_cov);
 	}
 	if (generating_stackusage) {
-		get_file_from_cache(cached_su, output_su);
+		copy_file_from_cache(cached_su, output_su);
 	}
 	if (generating_diagnostics) {
-		get_file_from_cache(cached_dia, output_dia);
+		copy_file_from_cache(cached_dia, output_dia);
 	}
 
 	MTR_END("file", "file_get");
@@ -2995,6 +3045,76 @@ detect_pch(const char *option, const char *arg, bool *found_pch)
 	return true;
 }
 
+static bool
+process_profiling_option(const char *arg)
+{
+	char *new_profile_path = NULL;
+	bool new_profile_use = false;
+
+	if (str_startswith(arg, "-fprofile-dir=")) {
+		new_profile_path = x_strdup(strchr(arg, '=') + 1);
+	} else if (str_eq(arg, "-fprofile-generate")
+		         || str_eq(arg, "-fprofile-instr-generate")) {
+		profile_generate = true;
+		if (guessed_compiler == GUESSED_CLANG) {
+			new_profile_path = x_strdup(".");
+		} else {
+			// GCC uses $PWD/$(basename $obj).
+			new_profile_path = get_cwd();
+		}
+	} else if (str_startswith(arg, "-fprofile-generate=")
+		         || str_startswith(arg, "-fprofile-instr-generate=")) {
+		profile_generate = true;
+		new_profile_path = x_strdup(strchr(arg, '=') + 1);
+	} else if (str_eq(arg, "-fprofile-use")
+	           || str_eq(arg, "-fprofile-instr-use")
+	           || str_eq(arg, "-fprofile-sample-use")
+	           || str_eq(arg, "-fbranch-probabilities")
+	           || str_eq(arg, "-fauto-profile")) {
+		new_profile_use = true;
+		if (!profile_path) {
+			new_profile_path = x_strdup(".");
+		}
+	} else if (str_startswith(arg, "-fprofile-use=")
+		         || str_startswith(arg, "-fprofile-instr-use=")
+		         || str_startswith(arg, "-fprofile-sample-use=")
+		         || str_startswith(arg, "-fauto-profile=")) {
+		new_profile_use = true;
+		new_profile_path = x_strdup(strchr(arg, '=') + 1);
+	} else if (str_eq(arg, "-fprofile-sample-accurate")) {
+		return true;
+	} else {
+		cc_log("Unknown profiling option: %s", arg);
+		stats_update(STATS_UNSUPPORTED_OPTION);
+		return false;
+	}
+
+	if (new_profile_use) {
+		if (profile_use) {
+			free(new_profile_path);
+			cc_log("Multiple profiling options not supported");
+			stats_update(STATS_UNSUPPORTED_OPTION);
+			return false;
+		}
+		profile_use = true;
+	}
+
+	if (new_profile_path) {
+		free(profile_path);
+		profile_path = new_profile_path;
+		cc_log("Set profile directory to %s", profile_path);
+	}
+
+	if (profile_generate && profile_use) {
+		// Too hard to figure out what the compiler will do.
+		cc_log("Both generating and using profile info, giving up");
+		stats_update(STATS_UNSUPPORTED_OPTION);
+		return false;
+	}
+
+	return true;
+}
+
 // Process the compiler options into options suitable for passing to the
 // preprocessor and the real compiler. preprocessor_args doesn't include -E;
 // this is added later. extra_args_to_hash are the arguments that are not
@@ -3163,7 +3283,7 @@ cc_process_args(struct args *args,
 
 		// -Xarch_* options are too hard.
 		if (str_startswith(argv[i], "-Xarch_")) {
-			cc_log("Unsupported compiler option :%s", argv[i]);
+			cc_log("Unsupported compiler option: %s", argv[i]);
 			stats_update(STATS_UNSUPPORTED_OPTION);
 			result = false;
 			goto out;
@@ -3413,10 +3533,16 @@ cc_process_args(struct args *args,
 			args_add(common_args, argv[i]);
 			continue;
 		}
-		if (str_startswith(argv[i], "-fprofile-dir=")) {
-			profile_dir = x_strdup(argv[i] + 14);
-			args_add(common_args, argv[i]);
-			continue;
+		if (str_startswith(argv[i], "-fprofile-")
+		    || str_startswith(argv[i], "-fauto-profile")
+		    || str_eq(argv[i], "-fbranch-probabilities")) {
+			if (process_profiling_option(argv[i])) {
+				args_add(common_args, argv[i]);
+				continue;
+			} else {
+				result = false;
+				goto out;
+			}
 		}
 		if (str_startswith(argv[i], "-fsanitize-blacklist=")) {
 			sanitize_blacklists = x_realloc(
@@ -3537,60 +3663,6 @@ cc_process_args(struct args *args,
 			output_dia = make_relative_path(x_strdup(argv[i+1]));
 			i++;
 			continue;
-		}
-
-		if (str_startswith(argv[i], "-fprofile-")) {
-			char *arg = x_strdup(argv[i]);
-			const char *arg_profile_dir = strchr(argv[i], '=');
-			if (arg_profile_dir) {
-				// Convert to absolute path.
-				char *dir = x_realpath(arg_profile_dir + 1);
-				if (!dir) {
-					// Directory doesn't exist.
-					dir = x_strdup(arg_profile_dir + 1);
-				}
-
-				// We can get a better hit rate by using the real path here.
-				free(arg);
-				char *option = x_strndup(argv[i], arg_profile_dir - argv[i]);
-				arg = format("%s=%s", option, dir);
-				cc_log("Rewriting %s to %s", argv[i], arg);
-				free(option);
-				free(dir);
-			}
-
-			bool supported_profile_option = false;
-			if (str_startswith(argv[i], "-fprofile-generate")
-			    || str_eq(argv[i], "-fprofile-arcs")) {
-				profile_generate = true;
-				supported_profile_option = true;
-			} else if (str_startswith(argv[i], "-fprofile-use")
-			           || str_eq(argv[i], "-fbranch-probabilities")) {
-				profile_use = true;
-				supported_profile_option = true;
-			} else if (str_eq(argv[i], "-fprofile-dir")) {
-				supported_profile_option = true;
-			}
-
-			if (supported_profile_option) {
-				args_add(common_args, arg);
-				free(arg);
-
-				// If the profile directory has already been set, give up... Hard to
-				// know what the user means, and what the compiler will do.
-				if (arg_profile_dir && profile_dir) {
-					cc_log("Profile directory already set; giving up");
-					stats_update(STATS_UNSUPPORTED_OPTION);
-					result = false;
-					goto out;
-				} else if (arg_profile_dir) {
-					cc_log("Setting profile directory to %s", arg_profile_dir);
-					profile_dir = x_strdup(arg_profile_dir);
-				}
-				continue;
-			}
-			cc_log("Unknown profile option: %s", argv[i]);
-			free(arg);
 		}
 
 		if (str_eq(argv[i], "-fcolor-diagnostics")
@@ -4330,7 +4402,9 @@ cc_reset(void)
 	}
 	free(debug_prefix_maps); debug_prefix_maps = NULL;
 	debug_prefix_maps_len = 0;
-	free(profile_dir); profile_dir = NULL;
+	free(profile_path); profile_path = NULL;
+	profile_use = false;
+	profile_generate = false;
 	for (size_t i = 0; i < sanitize_blacklists_len; i++) {
 		free(sanitize_blacklists[i]);
 		sanitize_blacklists[i] = NULL;
@@ -4375,7 +4449,6 @@ cc_reset(void)
 	generating_coverage = false;
 	generating_stackusage = false;
 	profile_arcs = false;
-	free(profile_dir); profile_dir = NULL;
 	i_tmpfile = NULL;
 	direct_i_file = false;
 	free(cpp_stderr); cpp_stderr = NULL;
