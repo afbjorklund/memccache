@@ -3,6 +3,8 @@ memccache – a fast compiler cache
 
 _(ccache with memcached support)_
 
+Originally from PR [#30](https://github.com/ccache/ccache/pull/30) and PR [#58](https://github.com/ccache/ccache/pull/58)
+
 [![Build Status](https://travis-ci.org/ccache/ccache.svg?branch=3.7-maint)](https://travis-ci.org/ccache/ccache)
 [![Code Quality: Cpp](https://img.shields.io/lgtm/grade/cpp/g/ccache/ccache.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ccache/ccache/context:cpp)
 [![Total Alerts](https://img.shields.io/lgtm/alerts/g/ccache/ccache.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ccache/ccache/alerts)
