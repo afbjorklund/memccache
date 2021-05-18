@@ -24,8 +24,8 @@ TEST_SUITE(compopt)
 
 TEST(option_table_should_be_sorted)
 {
-	bool compopt_verify_sortedness();
-	CHECK(compopt_verify_sortedness());
+	bool compopt_verify_sortedness_and_flags(void);
+	CHECK(compopt_verify_sortedness_and_flags());
 }
 
 TEST(dash_I_affects_cpp)
@@ -45,7 +45,7 @@ TEST(dash_V_doesnt_affect_cpp)
 	CHECK(!compopt_affects_cpp("-V"));
 }
 
-TEST(dash_doesnexist_doesnt_affect_cpp)
+TEST(dash_doesntexist_doesnt_affect_cpp)
 {
 	CHECK(!compopt_affects_cpp("-doesntexist"));
 }
@@ -90,7 +90,7 @@ TEST(dash_fstack_usage_not_too_hard)
 	CHECK(!compopt_too_hard("-fstack-usage"));
 }
 
-TEST(dash_doesnexist_not_too_hard)
+TEST(dash_doesntexist_not_too_hard)
 {
 	CHECK(!compopt_too_hard("-doesntexist"));
 }
@@ -123,6 +123,16 @@ TEST(dash_xxx_doesnt_take_arg)
 TEST(dash_iframework_prefix_affects_cpp)
 {
 	CHECK(compopt_prefix_affects_cpp("-iframework"));
+}
+
+TEST(dash_analyze_too_hard)
+{
+	CHECK(compopt_too_hard("-analyze"));
+}
+
+TEST(dash_dash_analyze_too_hard)
+{
+	CHECK(compopt_too_hard("--analyze"));
 }
 
 TEST_SUITE_END

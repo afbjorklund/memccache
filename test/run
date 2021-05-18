@@ -3,7 +3,7 @@
 # A simple test suite for ccache.
 #
 # Copyright (C) 2002-2007 Andrew Tridgell
-# Copyright (C) 2009-2018 Joel Rosdahl
+# Copyright (C) 2009-2020 Joel Rosdahl
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -152,15 +152,24 @@ expect_different_files() {
     fi
 }
 
-expect_equal_object_files() {
+is_equal_object_files() {
     if $HOST_OS_LINUX && $COMPILER_TYPE_CLANG; then
         if ! which eu-elfcmp >/dev/null 2>&1; then
             test_failed "Please install elfutils to get eu-elfcmp"
         fi
         eu-elfcmp -q "$1" "$2"
+    elif $HOST_OS_FREEBSD && $COMPILER_TYPE_CLANG; then
+        elfdump -a -w "$1".dump "$1"
+        elfdump -a -w "$2".dump "$2"
+        # these were the elfdump fields that seemed to differ (empirically)
+        diff -I e_shoff -I sh_size -I st_name "$1".dump "$2".dump > /dev/null
     else
         cmp -s "$1" "$2"
     fi
+}
+
+expect_equal_object_files() {
+    is_equal_object_files "$1" "$2"
     if [ $? -ne 0 ]; then
         test_failed "Objects differ: $1 != $2"
     fi
@@ -185,6 +194,15 @@ expect_file_count() {
     local actual=`find $dir -type f -name "$pattern" | wc -l`
     if [ $actual -ne $expected ]; then
         test_failed "Found $actual (expected $expected) $pattern files in $dir"
+    fi
+}
+
+# Verify that $1 is newer than (or same age as) $2.
+expect_file_newer_than() {
+    local newer_file=$1
+    local older_file=$2
+    if [ "$newer_file" -ot "$older_file" ]; then
+        test_failed "$newer_file is older than $older_file"
     fi
 }
 
@@ -244,8 +262,12 @@ EOF
 
     cd /
     remove_cache
-    rm -rf $ABS_TESTDIR/run
-    mkdir $ABS_TESTDIR/run
+    rm -rf $ABS_TESTDIR/run $ABS_TESTDIR/run.real
+
+    # Verify that tests behave well when apparent CWD != actual CWD.
+    mkdir $ABS_TESTDIR/run.real
+    ln -s run.real $ABS_TESTDIR/run
+
     cd $ABS_TESTDIR/run
     if type SUITE_${suite_name}_SETUP >/dev/null 2>&1; then
         SUITE_${suite_name}_SETUP
@@ -254,6 +276,8 @@ EOF
 
 # =============================================================================
 # main program
+
+export LC_ALL=C
 
 if pwd | grep '[^A-Za-z0-9/.,=_%+-]' >/dev/null 2>&1; then
     cat <<EOF
@@ -267,7 +291,7 @@ fi
 HOST_CCACHE_DIRS="/usr/lib/ccache/bin
 /usr/lib/ccache"
 for HOST_CCACHE_DIR in $HOST_CCACHE_DIRS; do
-    PATH=$(echo -n $PATH | awk -v RS=: -v ORS=: '$0 != "'$HOST_CCACHE_DIR'"' | sed 's/:$//')
+    PATH="$(echo "$PATH:" | awk -v RS=: -v ORS=: '$0 != "'$HOST_CCACHE_DIR'"' | sed 's/:*$//')"
 done
 export PATH
 
@@ -288,6 +312,7 @@ COMPILER_USES_MINGW=false
 
 HOST_OS_APPLE=false
 HOST_OS_LINUX=false
+HOST_OS_FREEBSD=false
 HOST_OS_WINDOWS=false
 
 compiler_version="`$COMPILER --version 2>&1 | head -1`"
@@ -297,6 +322,7 @@ case $compiler_version in
         ;;
     *clang*)
         COMPILER_TYPE_CLANG=true
+        CLANG_VERSION_SUFFIX=$(echo $COMPILER | sed -r 's/.*clang//')
         ;;
     *)
         echo "WARNING: Compiler $COMPILER not supported (version: $compiler_version) -- not running tests" >&2
@@ -322,6 +348,9 @@ case $(uname -s) in
         ;;
     *Linux*)
         HOST_OS_LINUX=true
+        ;;
+    *FreeBSD*)
+        HOST_OS_FREEBSD=true
         ;;
 esac
 
@@ -364,10 +393,17 @@ nocpp2
 cpp1
 multi_arch
 serialize_diagnostics
+sanitize_blacklist
 debug_prefix_map
+profiling
+profiling_gcc
+profiling_clang
+split_dwarf
 masquerading
 hardlink
 direct
+direct_gcc
+depend
 basedir
 compression
 readonly

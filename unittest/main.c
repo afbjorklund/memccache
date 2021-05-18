@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2018 Joel Rosdahl
+// Copyright (C) 2010-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -27,13 +27,13 @@
 #undef SUITE
 // *INDENT-ON* enable uncrustify
 
-const char USAGE_TEXT[] =
-  "Usage:\n"
-  "    test [options]\n"
-  "\n"
-  "Options:\n"
-  "    -h, --help      print this help text\n"
-  "    -v, --verbose   enable verbose logging of tests\n";
+static const char USAGE_TEXT[] =
+	"Usage:\n"
+	"    test [options]\n"
+	"\n"
+	"Options:\n"
+	"    -h, --help      print this help text\n"
+	"    -v, --verbose   enable verbose logging of tests\n";
 
 int
 main(int argc, char **argv)
@@ -72,10 +72,6 @@ main(int argc, char **argv)
 			fprintf(stderr, USAGE_TEXT);
 			return 1;
 		}
-	}
-
-	if (getenv("RUN_FROM_BUILD_FARM")) {
-		verbose = 1;
 	}
 
 	testdir = format("testdir.%d", (int)getpid());
