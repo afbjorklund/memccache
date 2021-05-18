@@ -1,14 +1,14 @@
-CCACHE(1)
-=========
-:man source:  ccache
+MEMCCACHE(1)
+============
+:man source:  memccache
 :man version: {revnumber}
-:man manual:  ccache Manual
+:man manual:  memccache Manual
 
 
 Name
 ----
 
-ccache - a fast C/C++ compiler cache
+memccache - a fast C/C++ compiler cache
 
 
 Synopsis

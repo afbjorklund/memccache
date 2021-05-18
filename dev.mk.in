@@ -20,17 +20,17 @@ version := \
     $(shell (git --git-dir=$(srcdir)/.git describe --dirty || git --git-dir=$(srcdir)/.git describe || echo vunknown) \
             2>/dev/null | sed -e 's/v//' -e 's/-/+/' -e 's/-/_/g')
 
-dist_dir = ccache-$(version)
+dist_dir = memccache-$(version)
 dist_archives = \
-    ccache-$(version).tar.gz \
-    ccache-$(version).tar.xz
+    memccache-$(version).tar.gz \
+    memccache-$(version).tar.xz
 
 generated_docs = \
     LICENSE.html \
     doc/AUTHORS.html \
     doc/MANUAL.html \
     doc/NEWS.html \
-    doc/ccache.1
+    doc/memccache.1
 built_dist_files = $(generated_sources) $(generated_docs)
 
 headers = \
@@ -184,7 +184,7 @@ docs: $(generated_docs)
 	$(Q)$(ASCIIDOC) -a revnumber=$(version) -d manpage -b docbook -o - $< | \
 	  perl -pe 's!<literal>(.*?)</literal>!<emphasis role="strong">\1</emphasis>!g' >$@
 
-doc/ccache.1: doc/MANUAL.xml
+doc/memccache.1: doc/MANUAL.xml
 	$(if $(quiet),@echo "  A2X      $@")
 	$(Q)$(A2X) --doctype manpage --format manpage $<
 

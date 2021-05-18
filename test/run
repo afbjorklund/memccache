@@ -306,7 +306,7 @@ else
     COMPILER=gcc
 fi
 if [ -z "$CCACHE" ]; then
-    CCACHE=`pwd`/ccache
+    CCACHE=`pwd`/memccache
 fi
 
 COMPILER_TYPE_CLANG=false

@@ -3,7 +3,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT()
 AC_PREREQ(2.52)
 
-AC_MSG_NOTICE([configuring ccache])
+AC_MSG_NOTICE([configuring memccache])
 
 AC_CONFIG_HEADER(config.h)
 
@@ -125,11 +125,11 @@ if test x${enable_static} != x; then
 fi
 
 AC_ARG_ENABLE(memcached,
-  [AS_HELP_STRING([--enable-memcached],
+  [AS_HELP_STRING([--disable-memcached],
     [enable memcached as a cache backend])])
 
 dnl enable-memcached: Check if -lmemcached is needed.
-if test x${enable_memcached} != x; then
+if test x${enable_memcached} != xno; then
     if test x${enable_static} != x; then
         AC_CHECK_LIB(stdc++, __gxx_personality_v0,[])
     fi
@@ -289,4 +289,4 @@ cat <<EOF >>config.h.tmp
 EOF
 mv config.h.tmp config.h
 
-AC_MSG_NOTICE(now build ccache by running make)
+AC_MSG_NOTICE(now build memccache by running make)

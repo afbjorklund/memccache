@@ -93,7 +93,7 @@ all_objs = $(ccache_objs) $(test_objs) $(zlib_objs)
 
 files_to_clean = \
     $(all_objs) \
-    ccache$(EXEEXT) \
+    memccache$(EXEEXT) \
     src/*~ \
     src/zlib/libz.a \
     testdir.* \
@@ -103,24 +103,24 @@ files_to_clean = \
 files_to_distclean = Makefile config.h config.log config.status
 
 .PHONY: all
-all: ccache$(EXEEXT)
+all: memccache$(EXEEXT)
 
-ccache$(EXEEXT): $(ccache_objs) $(extra_libs)
+memccache$(EXEEXT): $(ccache_objs) $(extra_libs)
 	$(if $(quiet),@echo "  LD       $@")
 	$(Q)$(CC) -o $@ $(ccache_objs) $(LDFLAGS) $(extra_libs) $(LIBS)
 
-ccache.1: doc/ccache.1
+memccache.1: doc/memccache.1
 	$(if $(quiet),@echo "  CP       $@")
 	$(Q)cp $< $@
 
 .PHONY: install
-install: ccache$(EXEEXT) @disable_man@ccache.1
-	$(if $(quiet),@echo "  INSTALL  ccache$(EXEEXT)")
+install: memccache$(EXEEXT) @disable_man@memccache.1
+	$(if $(quiet),@echo "  INSTALL  memccache$(EXEEXT)")
 	$(Q)$(installcmd) -d $(DESTDIR)$(bindir)
-	$(Q)$(installcmd) -m 755 ccache$(EXEEXT) $(DESTDIR)$(bindir)
-@disable_man@	$(if $(quiet),@echo "  INSTALL  ccache.1")
+	$(Q)$(installcmd) -m 755 memccache$(EXEEXT) $(DESTDIR)$(bindir)
+@disable_man@	$(if $(quiet),@echo "  INSTALL  memccache.1")
 @disable_man@	$(Q)$(installcmd) -d $(DESTDIR)$(mandir)/man1
-@disable_man@	$(Q)-$(installcmd) -m 644 ccache.1 $(DESTDIR)$(mandir)/man1/
+@disable_man@	$(Q)-$(installcmd) -m 644 memccache.1 $(DESTDIR)$(mandir)/man1/
 
 .PHONY: clean
 clean:
@@ -139,11 +139,11 @@ src/zlib/libz.a: $(zlib_objs)
 	$(Q)$(RANLIB) $@
 
 .PHONY: performance
-performance: ccache$(EXEEXT)
-	$(srcdir)/misc/performance --ccache ccache$(EXEEXT) $(CC) $(all_cppflags) $(all_cflags) $(srcdir)/src/ccache.c
+performance: memccache$(EXEEXT)
+	$(srcdir)/misc/performance --ccache memccache$(EXEEXT) $(CC) $(all_cppflags) $(all_cflags) $(srcdir)/src/ccache.c
 
 .PHONY: test
-test: ccache$(EXEEXT) unittest/run$(EXEEXT)
+test: memccache$(EXEEXT) unittest/run$(EXEEXT)
 	$(if $(quiet),@echo "  TEST     unittest/run$(EXEEXT)")
 	$(Q)unittest/run$(EXEEXT)
 	$(if $(quiet),@echo "  TEST     $(srcdir)/test/run")
@@ -172,9 +172,9 @@ distclean: clean
 	rm -rf $(files_to_distclean)
 
 .PHONY: installcheck
-installcheck: ccache$(EXEEXT) unittest/run$(EXEEXT)
+installcheck: memccache$(EXEEXT) unittest/run$(EXEEXT)
 	unittest/run$(EXEEXT)
-	CCACHE=$(bindir)/ccache CC='$(CC)' $(BASH) $(srcdir)/test/run
+	CCACHE=$(bindir)/memccache CC='$(CC)' $(BASH) $(srcdir)/test/run
 
 .c.o:
 	$(if $(quiet),@echo "  CC       $@")

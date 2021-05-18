@@ -4918,7 +4918,7 @@ int ccache_main(int argc, char *argv[]);
 int
 ccache_main(int argc, char *argv[])
 {
-	// Check if we are being invoked as "ccache".
+	// Check if we are being invoked as "memccache".
 	char *program_name = basename(argv[0]);
 	if (same_executable_name(program_name, MYNAME)) {
 		if (argc < 2) {
