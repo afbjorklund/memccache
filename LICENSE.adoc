@@ -506,7 +506,7 @@ following license:
 src/lz4/*.[hc]
 ~~~~~~~~~~~
 
-This is a bundled subset of LZ4 1.7.5 from <http://lz4.org> with the
+This is a bundled subset of LZ4 1.8.3 from <http://lz4.org> with the
 following license:
 
 -------------------------------------------------------------------------------
