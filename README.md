@@ -13,6 +13,9 @@ ccache is a compiler cache. It speeds up recompilation by caching the result of
 previous compilations and detecting when the same compilation is being done
 again. Supported languages are C, C++, Objective-C and Objective-C++.
 
+memcached is a high-performance, distributed memory object caching system.
+It can be complimented with moxi proxy <https://github.com/couchbase/moxi>
+and couchbase server <https://couchbase.com/memcached-replacement>.
 
 General information
 -------------------
