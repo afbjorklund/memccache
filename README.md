@@ -17,6 +17,9 @@ memcached is a high-performance, distributed memory object caching system.
 It can be complimented with moxi proxy <https://github.com/couchbase/moxi>
 and couchbase server <https://couchbase.com/memcached-replacement>.
 
+* <https://docs.couchbase.com/server/5.0/install/ubuntu-debian-install.html>
+* tested with `couchbase-server-community_5.0.1-5003-1_amd64.deb`
+
 General information
 -------------------
 
