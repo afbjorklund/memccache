@@ -115,15 +115,30 @@ compiler options apply and you should refer to the compiler's documentation.
     Clear the entire cache, removing all cached files, but keeping the
     configuration file.
 
+*`--dump-manifest`*=_PATH_::
+
+    Dump manifest file at PATH in text format. This is only useful when
+    debugging ccache and its behavior.
+
+*`-k, --get-config`*=_KEY_::
+
+    Print the value of configuration option _KEY_. See
+    <<_configuration,CONFIGURATION>> for more information.
+
+*`--hash-file`*=_PATH_::
+
+    Print the hash (in format `<MD4>-<size>`) of the file at PATH. This is only
+    useful when debugging ccache and its behavior.
+
+*`-h, --help`*::
+
+    Print an options summary page.
+
 *`-F, --max-files`*=_N_::
 
     Set the maximum number of files allowed in the cache. Use 0 for no limit.
     The value is stored in a configuration file in the cache directory and
     applies to all future compilations.
-
-*`-h, --help`*::
-
-    Print an options summary page.
 
 *`-M, --max-size`*=_SIZE_::
 
@@ -133,19 +148,26 @@ compiler options apply and you should refer to the compiler's documentation.
     stored in a configuration file in the cache directory and applies to all
     future compilations.
 
+*`--print-stats`*::
+
+    Print statistics counter IDs and corresponding values machine-parsable
+    (tab-separated) format.
+
 *`-o, --set-config`*=_KEY=VALUE_::
 
-    Set configuration _KEY_ to _VALUE_. See <<_configuration,CONFIGURATION>>
-    for more information.
+    Set configuration option _KEY_ to _VALUE_. See
+    <<_configuration,CONFIGURATION>> for more information.
 
-*`-p, --print-config`*::
+*`-p, --show-config`*::
 
     Print current configuration options and from where they originate
-    (environment variable, configuration file or compile-time default).
+    (environment variable, configuration file or compile-time default) in
+    human-readable format.
 
 *`-s, --show-stats`*::
 
-    Print the current statistics summary for the cache.
+    Print a summary of configuration and statistics counters in human-readable
+    format.
 
 *`-V, --version`*::
 
@@ -262,7 +284,7 @@ IN DIFFERENT DIRECTORIES>>.
     This setting allows you to choose the number of directory levels in the
     cache directory. The default is 2. The minimum is 1 and the maximum is 8.
 
-*compiler* (*CCACHE_CC*)::
+*compiler* (*CCACHE_COMPILER* or (deprecated) *CCACHE_CC*)::
 
     This setting can be used to force the name of the compiler to use. If set
     to the empty string (which is the default), ccache works it out from the
@@ -342,14 +364,6 @@ WRAPPERS>>.
     to 6, and must be no lower than 1 (fastest, worst compression) and no
     higher than 9 (slowest, best compression).
 
-*cpp_extension* (*CCACHE_EXTENSION*)::
-
-    This setting can be used to force a certain extension for the intermediate
-    preprocessed file. The default is to automatically determine the extension
-    to use for intermediate preprocessor files based on the type of file being
-    compiled, but that sometimes doesn't work. For example, when using the
-    ``aCC'' compiler on HP-UX, set the cpp extension to *i*.
-
 *couchbase_conf* (*CCACHE_COUCHBASE_CONF*)::
 
     The couchbase_conf option sets the libcouchbase configuration to use
@@ -358,6 +372,26 @@ WRAPPERS>>.
 -------------------------------------------------------------------------------
 CCACHE_COUCHBASE_CONF=couchbase://localhost/default
 -------------------------------------------------------------------------------
+
+*cpp_extension* (*CCACHE_EXTENSION*)::
+
+    This setting can be used to force a certain extension for the intermediate
+    preprocessed file. The default is to automatically determine the extension
+    to use for intermediate preprocessor files based on the type of file being
+    compiled, but that sometimes doesn't work. For example, when using the
+    ``aCC'' compiler on HP-UX, set the cpp extension to *i*.
+
+*debug* (*CCACHE_DEBUG* or *CCACHE_NODEBUG*, see <<_boolean_values,Boolean values>> above)::
+
+    If true, enable the debug mode. The debug mode creates per-object debug
+    files that are helpful when debugging unexpected cache misses. Note however
+    that ccache performance will be reduced slightly. See
+    <<_cache_debugging,debugging>> for more information. The default is false.
+
+*depend_mode* (*CCACHE_DEPEND* or *CCACHE_NODEPEND*, see <<_boolean_values,Boolean values>> above)::
+
+    If true, the depend mode will be used. The default is false. See
+    <<_the_depend_mode,THE DEPEND MODE>>.
 
 *direct_mode* (*CCACHE_DIRECT* or *CCACHE_NODIRECT*, see <<_boolean_values,Boolean values>> above)::
 
@@ -474,6 +508,14 @@ CCACHE_MEMCACHED_CONF=--SERVER=localhost:11211
     matching the compiler name in the normal *PATH* that isn't a symbolic link
     to ccache itself.
 
+*pch_external_checksum* (*CCACHE_PCH_EXTSUM* or *CCACHE_NOPCH_EXTSUM*, see <<_boolean_values,Boolean values>> above)::
+
+    When this option is set, and ccache finds a precompiled header file,
+    ccache will look for a file with the extension ``.sum'' added
+    (e.g. ``pre.h.gch.sum''), and if found, it will hash this file instead
+    of the precompiled header itself to work around the performance
+    penalty of hashing very large files.
+
 *prefix_command* (*CCACHE_PREFIX*)::
 
     This option adds a list of prefixes (separated by space) to the command
@@ -489,9 +531,13 @@ CCACHE_MEMCACHED_CONF=--SERVER=localhost:11211
 *read_only* (*CCACHE_READONLY* or *CCACHE_NOREADONLY*, see <<_boolean_values,Boolean values>> above)::
 
     If true, ccache will attempt to use existing cached object files, but it
-    will not to try to add anything new to the cache. If you are using this
-    because your ccache directory is read-only, then you need to set
-    *temporary_dir* as otherwise ccache will fail to create temporary files.
+    will not add new results to the cache. Statistics counters will still be
+    updated, though, unless the *stats* option is set to *false*.
++
+If you are using this because your ccache directory is read-only, you need to
+set *temporary_dir* since ccache will fail to create temporary files otherwise.
+You may also want to set *stats = false* to make ccache not even try to update
+stats files.
 
 *read_only_direct* (*CCACHE_READONLY_DIRECT* or *CCACHE_NOREADONLY_DIRECT*, see <<_boolean_values,Boolean values>> above)::
 
@@ -499,7 +545,7 @@ CCACHE_MEMCACHED_CONF=--SERVER=localhost:11211
     from the cache using the direct mode, not the preprocessor mode. See
     documentation for *read_only* regarding using a read-only ccache directory.
 
-*read_only_memcached* (*CCACHE_READONLY_MEMCACHED*) [boolean]::
+*read_only_memcached* (*CCACHE_READONLY_MEMCACHED* or *CCACHE_NOREADONLY_MEMCACHED*), see <<_boolean_values,Boolean values>> above)::
 
     If true, ccache will attempt to get previously cached values from memcached,
     but will not try to store any new values in memcached.
@@ -539,25 +585,35 @@ still has to do _some_ preprocessing (like macros).
     should be a comma-separated string with options. Available options are:
 +
 --
-*file_macro*::
-    Ignore `__FILE__` being present in the source.
+*clang_index_store*::
+    Ignore the Clang compiler option *-index-store-path* and its argument when
+    computing the manifest hash. This is useful if you use Xcode, which uses an
+    index store path derived from the local project path. Note that the index
+    store won't be updated correctly on cache hits if you enable this option.
 *file_stat_matches*::
     ccache normally examines a file's contents to determine whether it matches
     the cached version. With this option set, ccache will consider a file as
     matching its cached version if the mtimes and ctimes match.
+*file_stat_matches_ctime*::
+    Ignore ctimes when *file_stat_matches* is enabled. This can be useful when
+    backdating files' mtimes in a controlled way.
 *include_file_ctime*::
-    By default, ccache also will not cache a file if it includes a header whose
+    By default, ccache will not cache a file if it includes a header whose
     ctime is too new. This option disables that check.
 *include_file_mtime*::
     By default, ccache will not cache a file if it includes a header whose
     mtime is too new. This option disables that check.
-*no_system_headers*::
-    By default, ccache will also include all system headers in the manifest.
-    With this option set, ccache will only include system headers in the hash
-    but not add the system header files to the list of include files.
+*locale*::
+    ccache includes the environment variables *LANG*, *LC_ALL*, *LC_CTYPE* and
+    *LC_MESSAGES* in the hash by default since they may affect localization of
+    compiler warning messages. Set this option to tell ccache not to do that.
 *pch_defines*::
     Be sloppy about **#define**s when precompiling a header file. See
     <<_precompiled_headers,PRECOMPILED HEADERS>> for more information.
+*system_headers*::
+    By default, ccache will also include all system headers in the manifest.
+    With this option set, ccache will only include system headers in the hash
+    but not add the system header files to the list of include files.
 *time_macros*::
     Ignore `__DATE__` and `__TIME__` being present in the source code.
 --
@@ -585,18 +641,6 @@ NOTE: In previous versions of ccache, *CCACHE_TEMPDIR* had to be on the same
     as the compiler). This is mostly useful when you wish to share your cache
     with other users. Note that this also affects the file permissions set on
     the object files created from your compilations.
-
-*unify* (*CCACHE_UNIFY* or *CCACHE_NOUNIFY*, see <<_boolean_values,Boolean values>> above)::
-
-    If true, ccache will use a C/C++ unifier when hashing the preprocessor
-    output if the *-g* option is not used. The unifier is slower than a normal
-    hash, so setting this environment variable loses a little bit of speed, but
-    it means that ccache can take advantage of not recompiling when the changes
-    to the source code consist of reformatting only. Note that enabling the
-    unifier changes the hash, so cached compilations produced when the unifier
-    is enabled cannot be reused when the unifier is disabled, and vice versa.
-    Enabling the unifier may result in incorrect line number information in
-    compiler warning messages and expansions of the `__LINE__` macro.
 
 
 Cache size management
@@ -756,6 +800,12 @@ The compiler was instructed to write its output to standard output using *-o
 | preprocessor error |
 Preprocessing the source code using the compiler's *-E* option failed.
 
+| stats updated |
+When statistics were updated the last time.
+
+| stats zeroed |
+When *ccache -z* was called the last time.
+
 | unsupported code directive |
 Code like the assembler *.incbin* directive was found. This is not supported
 by ccache.
@@ -782,7 +832,8 @@ enough to be used to identify recompilations.) On a cache hit, ccache is able
 to supply all of the correct compiler outputs (including all warnings,
 dependency file, etc) from the cache.
 
-ccache has two ways of doing the detection:
+ccache has two ways of gathering information used to look up results in the
+cache:
 
 * the *direct mode*, where ccache hashes the source code and include files
   directly
@@ -792,11 +843,17 @@ ccache has two ways of doing the detection:
 The direct mode is generally faster since running the preprocessor has some
 overhead.
 
+If no previous result is detected (i.e., there is a cache miss) using the
+direct mode, ccache will fall back to the preprocessor mode unless the *depend
+mode* is enabled. In the depend mode, ccache never runs the preprocessor, not
+even on cache misses. Read more in <<_the_depend_mode,THE DEPEND MODE>>
+below.
+
 
 Common hashed information
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For both modes, the following information is included in the hash:
+The following information is always included in the hash:
 
 * the extension used by the compiler for a file with preprocessor output
   (normally *.i* for C code and *.ii* for C++ code)
@@ -867,6 +924,91 @@ Based on the hash, the cached compilation result can be looked up directly in
 the cache.
 
 
+The depend mode
+~~~~~~~~~~~~~~~
+
+If the depend mode is enabled, ccache will not use the preprocessor at all. The
+hash used to identify results in the cache will be based on the direct mode
+hash described above plus information about include files read from the
+dependency file generated by the compiler with *-MD* or *-MMD*.
+
+Advantages:
+
+* The ccache overhead of a cache miss will be much smaller.
+* Not running the preprocessor at all can be good if compilation is performed
+  remotely, for instance when using distcc or similar; ccache then won't make
+  potentially costly preprocessor calls on the local machine.
+
+Disadvantages:
+
+* The cache hit rate will likely be lower since any change to compiler options
+  or source code will make the hash different. Compare this with the default
+  setup where ccache will fall back to the preprocessor mode, which is tolerant
+  to some types of changes of compiler options and source code changes.
+* If -MD is used, the manifest entries will include system header files as
+  well, thus slowing down cache hits slightly, just as using -MD slows down
+  make.
+* If -MMD is used, the manifest entries will not include system header files,
+  which means ccache will ignore changes in them.
+
+The depend mode will be disabled if any of the following holds:
+
+* the configuration setting *depend_mode* is false
+* the configuration setting *run_second_cpp* is false
+* the compiler is not generating dependencies using *-MD* or *-MMD*
+
+
+Cache debugging
+---------------
+
+To find out what information ccache actually is hashing, you can enable the
+debug mode via the configuration setting *debug* or by setting *CCACHE_DEBUG*
+in the environment. This can be useful if you are investigating why you don't
+get cache hits. Note that performance will be reduced slightly.
+
+When the debug mode is enabled, ccache will create up to five additional files
+next to the object file:
+
+[options="header",cols="30%,70%"]
+|==============================================================================
+|Filename | Description
+| *<objectfile>.ccache-input-c* |
+Binary input hashed by both the direct mode and the preprocessor mode.
+
+| *<objectfile>.ccache-input-d* |
+Binary input only hashed by the direct mode.
+
+| *<objectfile>.ccache-input-p* |
+Binary input only hashed by the preprocessor mode.
+
+| *<objectfile>.ccache-input-text* |
+Human-readable combined diffable text version of the three files above.
+
+| *<objectfile>.ccache-log* |
+Log for this object file.
+
+|==============================================================================
+
+In the direct mode, ccache uses the MD4 hash of the *ccache-input-c*
++ *ccache-input-d* data (where *+* means concatenation), while the
+*ccache-input-c* + *ccache-input-p* data is used in the preprocessor mode.
+
+The *ccache-input-text* file is a combined text version of the three
+binary input files. It has three sections (“COMMON”, “DIRECT MODE” and
+“PREPROCESSOR MODE”), which is turn contain annotations that say what kind of
+data comes next.
+
+To debug why you don’t get an expected cache hit for an object file, you can do
+something like this:
+
+1. Build with debug mode enabled.
+2. Save the *<objectfile>.ccache-&#42;* files.
+3. Build again with debug mode enabled.
+4. Compare *<objectfile>.ccache-input-text* for the two builds. This together
+   with the *<objectfile>.ccache-log* files should give you some clues about
+   what is happening.
+
+
 Compiling in different directories
 ----------------------------------
 
@@ -919,11 +1061,14 @@ things to make it work properly:
 * You must either:
 +
 --
-** use the *-include* compiler option to include the precompiled header
-   (i.e., don't use *#include* in the source code to include the header); or
+** use the *-include* compiler option to include the precompiled header (i.e.,
+   don't use *#include* in the source code to include the header; the filename
+   itself must be sufficient to find the header, i.e. *-I* paths are not
+   searched); or
 ** (for the Clang compiler) use the *-include-pch* compiler option to include
    the PCH file generated from the precompiled header; or
-** add the *-fpch-preprocess* compiler option when compiling.
+** (for the GCC compiler) add the *-fpch-preprocess* compiler option when
+   compiling.
 
 If you don't do this, either the non-precompiled version of the header file
 will be used (if available) or ccache will fall back to running the real
@@ -980,6 +1125,13 @@ filesystems), but keep in mind that:
 
 A tip is to set *temporary_dir* to a directory on the local host to avoid NFS
 traffic for temporary files.
+
+It is recommended to use the same operating system version when using a shared
+cache. If operating system versions are different then system include files
+will likely be different and there will be few or no cache hits between the
+systems. One way of improving cache hit rate in that case is to set
+<<config_sloppiness,*sloppiness*>> to *system_headers* to ignore system
+headers.
 
 
 Sharing a cache with memcached
@@ -1060,9 +1212,10 @@ General
 ~~~~~~~
 
 A general tip for getting information about what ccache is doing is to enable
-debug logging by setting *log_file*. The log contains executed commands,
-important decisions that ccache makes, read and written files, etc. Another way
-of keeping track of what is happening is to check the output of *ccache -s*.
+debug logging by setting the configuration option *debug* (or the environment
+variable *CCACHE_DEBUG*); see <<_cache_debugging,debugging>> for more
+information. Another way of keeping track of what is happening is to check the
+output of *ccache -s*.
 
 
 Performance
@@ -1094,13 +1247,13 @@ problems and what may be done to increase the hit rate:
    setting.
 ** A modification time of one of the include files is too new (created the same
    second as the compilation is being done). This check is made to avoid a race
-   condition. To fix this, create the include file earlier in the build
-   process, if possible, or set *sloppiness* to *include_file_mtime* if you are
-   willing to take the risk. (The race condition consists of these events: the
-   preprocessor is run; an include file is modified by someone; the new include
-   file is hashed by ccache; the real compiler is run on the preprocessor's
-   output, which contains data from the old header file; the wrong object file
-   is stored in the cache.)
+   condition. To fix this, create the include file earlier in the build process,
+   if possible, or set *sloppiness* to *include_file_ctime, include_file_mtime*
+   if you are willing to take the risk. (The race condition consists of these
+   events: the preprocessor is run; an include file is modified by someone; the
+   new include file is hashed by ccache; the real compiler is run on the
+   preprocessor's output, which contains data from the old header file; the
+   wrong object file is stored in the cache.)
 ** The `__TIME__` preprocessor macro is (potentially) being used. ccache turns
    off direct mode if `__TIME__` is present in the source code. This is done as
    a safety measure since the string indicates that a `__TIME__` macro _may_
@@ -1116,13 +1269,10 @@ problems and what may be done to increase the hit rate:
    output. If you know that `__DATE__` isn't used in practise, or don't care if
    ccache produces objects where `__DATE__` is expanded to something in the
    past, you can set *sloppiness* to *time_macros*.
-** The `__FILE__` preprocessor macro is (potentially) being used and the file
-   path has changed. If `__FILE__` is present in the source code, ccache hashes
-   the current input file path in order to be able to produce the correct
-   object file if the `__FILE__` macro affects the output. If you know that
-   `__FILE__` isn't used in practise, or don't care if ccache produces objects
-   where `__FILE__` is expanded to the wrong path, you can set *sloppiness* to
-   *file_macro*.
+** The input file path has changed. ccache includes the input file path in the
+   direct mode hash to be able to take relative include files into account and
+   to produce a correct object file if the source code includes a `__FILE__`
+   macro.
 * If ``cache miss'' has been incremented even though the same code has been
   compiled and cached before, ccache has either detected that something has
   changed anyway or a cleanup has been performed (either explicitly or
@@ -1168,7 +1318,7 @@ More information
 ----------------
 
 Credits, mailing list information, bug reporting instructions, source code,
-etc, can be found on ccache's web site: <https://ccache.samba.org>.
+etc, can be found on ccache's web site: <https://ccache.dev>.
 
 
 Author
@@ -1176,4 +1326,4 @@ Author
 
 ccache was originally written by Andrew Tridgell and is currently developed and
 maintained by Joel Rosdahl. See AUTHORS.txt or AUTHORS.html and
-<https://ccache.samba.org/credits.html> for a list of contributors.
+<https://ccache.dev/credits.html> for a list of contributors.

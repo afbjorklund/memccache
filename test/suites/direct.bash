@@ -36,12 +36,16 @@ SUITE_direct() {
     expect_stat 'files in cache' 2 # .o + .manifest
     expect_equal_object_files reference_test.o test.o
 
+    manifest_file=$(find $CCACHE_DIR -name '*.manifest')
+    backdate $manifest_file
+
     $CCACHE_COMPILE -c test.c
     expect_stat 'cache hit (direct)' 1
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
     expect_stat 'files in cache' 2
     expect_equal_object_files reference_test.o test.o
+    expect_file_newer_than $manifest_file test.c
 
     # -------------------------------------------------------------------------
     TEST "Corrupt manifest file"
@@ -155,14 +159,29 @@ EOF
     mkdir a b
     touch a/source.c b/source.c
     backdate a/source.h b/source.h
-    $CCACHE_COMPILE -MMD -c a/source.c
-    expect_file_content source.d "source.o: a/source.c"
+    $CCACHE_COMPILE -MMD -c a/source.c -o a/source.o
+    expect_file_content a/source.d "a/source.o: a/source.c"
 
-    $CCACHE_COMPILE -MMD -c b/source.c
-    expect_file_content source.d "source.o: b/source.c"
+    $CCACHE_COMPILE -MMD -c b/source.c -o b/source.o
+    expect_file_content b/source.d "b/source.o: b/source.c"
 
-    $CCACHE_COMPILE -MMD -c a/source.c
-    expect_file_content source.d "source.o: a/source.c"
+    $CCACHE_COMPILE -MMD -c a/source.c -o a/source.o
+    expect_file_content a/source.d "a/source.o: a/source.c"
+
+    # -------------------------------------------------------------------------
+    TEST "Dependency file content"
+
+    mkdir build
+    touch test1.c
+    cp test1.c build
+
+    for src in test1.c build/test1.c; do
+        for obj in test1.o build/test1.o; do
+            $CCACHE_COMPILE -c -MMD $src -o $obj
+            dep=$(echo $obj | sed 's/\.o$/.d/')
+            expect_file_content $dep "$obj: $src"
+        done
+    done
 
     # -------------------------------------------------------------------------
     TEST "-MMD for different include file paths"
@@ -342,7 +361,7 @@ EOF
 int test() { return 0; }
 EOF
 
-    if $COMPILER_TYPE_GCC; then
+    if $REAL_COMPILER -c -fstack-usage code.c >/dev/null 2>&1; then
         $CCACHE_COMPILE -c -fstack-usage code.c
         expect_stat 'cache hit (direct)' 0
         expect_stat 'cache hit (preprocessed)' 0
@@ -435,6 +454,37 @@ EOF
     rm -f third_name.d
 
     # -------------------------------------------------------------------------
+    TEST "MF /dev/null"
+
+    $CCACHE_COMPILE -c -MD -MF /dev/null test.c
+    expect_stat 'cache hit (direct)' 0
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 1
+    expect_stat 'files in cache' 2 # .o + .manifest
+
+    $CCACHE_COMPILE -c -MD -MF /dev/null test.c
+    expect_stat 'cache hit (direct)' 1
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 1
+    expect_stat 'files in cache' 2
+
+    $CCACHE_COMPILE -c -MD -MF test.d test.c
+    expect_stat 'cache hit (direct)' 1
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 2
+    expect_stat 'files in cache' 5
+    expect_equal_files test.d expected.d
+
+    rm -f test.d
+
+    $CCACHE_COMPILE -c -MD -MF test.d test.c
+    expect_stat 'cache hit (direct)' 2
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 2
+    expect_stat 'files in cache' 5
+    expect_equal_files test.d expected.d
+
+    # -------------------------------------------------------------------------
     TEST "Missing .d file"
 
     $CCACHE_COMPILE -c -MD test.c
@@ -448,7 +498,7 @@ EOF
     expect_stat 'cache miss' 1
     expect_equal_files test.d expected.d
 
-    find $CCACHE_DIR -name '*.d' -delete
+    find $CCACHE_DIR -name '*.d' -exec rm '{}' +
 
     # Missing file -> consider the cached result broken.
     $CCACHE_COMPILE -c -MD test.c
@@ -519,12 +569,13 @@ EOF
     expect_stat 'cache miss' 1
 
     # -------------------------------------------------------------------------
-    TEST "__FILE__ in source file disables direct mode"
+    TEST "The source file path is included in the hash"
 
     cat <<EOF >file.c
 #define file __FILE__
 int test;
 EOF
+    cp file.c file2.c
 
     $CCACHE_COMPILE -c file.c
     expect_stat 'cache hit (direct)' 0
@@ -536,47 +587,34 @@ EOF
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
 
-    $CCACHE_COMPILE -c `pwd`/file.c
+    $CCACHE_COMPILE -c file2.c
     expect_stat 'cache hit (direct)' 1
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 2
 
-    # -------------------------------------------------------------------------
-    TEST "__FILE__ in include file disables direct mode"
-
-    cat <<EOF >file.h
-#define file __FILE__
-int test;
-EOF
-    backdate file.h
-    cat <<EOF >file_h.c
-#include "file.h"
-EOF
-
-    $CCACHE_COMPILE -c file_h.c
-    expect_stat 'cache hit (direct)' 0
-    expect_stat 'cache hit (preprocessed)' 0
-    expect_stat 'cache miss' 1
-
-    $CCACHE_COMPILE -c file_h.c
-    expect_stat 'cache hit (direct)' 1
-    expect_stat 'cache hit (preprocessed)' 0
-    expect_stat 'cache miss' 1
-
-    mv file_h.c file2_h.c
-
-    $CCACHE_COMPILE -c `pwd`/file2_h.c
-    expect_stat 'cache hit (direct)' 1
+    $CCACHE_COMPILE -c file2.c
+    expect_stat 'cache hit (direct)' 2
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 2
 
+    $CCACHE_COMPILE -c $(pwd)/file.c
+    expect_stat 'cache hit (direct)' 2
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 3
+
+    $CCACHE_COMPILE -c $(pwd)/file.c
+    expect_stat 'cache hit (direct)' 3
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 3
+
     # -------------------------------------------------------------------------
-    TEST "__FILE__ in source file ignored if sloppy"
+    TEST "The source file path is included even if sloppiness = file_macro"
 
     cat <<EOF >file.c
 #define file __FILE__
 int test;
 EOF
+    cp file.c file2.c
 
     CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c file.c
     expect_stat 'cache hit (direct)' 0
@@ -588,39 +626,66 @@ EOF
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
 
-    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c `pwd`/file.c
+    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c file2.c
+    expect_stat 'cache hit (direct)' 1
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 2
+
+    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c file2.c
     expect_stat 'cache hit (direct)' 2
     expect_stat 'cache hit (preprocessed)' 0
-    expect_stat 'cache miss' 1
+    expect_stat 'cache miss' 2
+
+    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c $(pwd)/file.c
+    expect_stat 'cache hit (direct)' 2
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 3
+
+    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c $(pwd)/file.c
+    expect_stat 'cache hit (direct)' 3
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 3
 
     # -------------------------------------------------------------------------
-    TEST "__FILE__ in include file ignored if sloppy"
+    TEST "Relative includes for identical source code in different directories"
 
-    cat <<EOF >file.h
-#define file __FILE__
-int test;
-EOF
-    backdate file.h
-    cat <<EOF >file_h.c
+    mkdir a
+    cat <<EOF >a/file.c
 #include "file.h"
 EOF
+    cat <<EOF >a/file.h
+int x = 1;
+EOF
+    backdate a/file.h
 
-    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c file_h.c
+    mkdir b
+    cat <<EOF >b/file.c
+#include "file.h"
+EOF
+    cat <<EOF >b/file.h
+int x = 2;
+EOF
+    backdate b/file.h
+
+    $CCACHE_COMPILE -c a/file.c
     expect_stat 'cache hit (direct)' 0
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
 
-    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c file_h.c
+    $CCACHE_COMPILE -c a/file.c
     expect_stat 'cache hit (direct)' 1
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
 
-    mv file_h.c file2_h.c
+    $CCACHE_COMPILE -c b/file.c
+    expect_stat 'cache hit (direct)' 1
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 2
 
-    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS file_macro" $CCACHE_COMPILE -c `pwd`/file2_h.c
+    $CCACHE_COMPILE -c b/file.c
     expect_stat 'cache hit (direct)' 2
     expect_stat 'cache hit (preprocessed)' 0
-    expect_stat 'cache miss' 1
+    expect_stat 'cache miss' 2
 
     # -------------------------------------------------------------------------
     TEST "__TIME__ in source file disables direct mode"
@@ -740,6 +805,19 @@ EOF
     expect_stat 'cache miss' 1
 
     CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS include_file_mtime" $CCACHE_COMPILE -c new.c
+    expect_stat 'cache hit (direct)' 1
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 1
+
+    # -------------------------------------------------------------------------
+    TEST "Sloppy Clang index store"
+
+    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS clang_index_store" $CCACHE_COMPILE -index-store-path foo -c test.c
+    expect_stat 'cache hit (direct)' 0
+    expect_stat 'cache hit (preprocessed)' 0
+    expect_stat 'cache miss' 1
+
+    CCACHE_SLOPPINESS="$DEFAULT_SLOPPINESS clang_index_store" $CCACHE_COMPILE -index-store-path bar -c test.c
     expect_stat 'cache hit (direct)' 1
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1

@@ -6,17 +6,23 @@
 %define lookup-function-name envtoconfitems_get
 %define slot-name env_name
 %define initializer-suffix ,""
+%{
+#include "envtoconfitems.h"
+%}
 struct env_to_conf_item;
 %%
 BASEDIR, "base_dir"
 CC, "compiler"
+COMPILER, "compiler"
 COMPILERCHECK, "compiler_check"
 COMPRESS, "compression"
 COMPRESSLEVEL, "compression_level"
 COUCHBASE_CONF, "couchbase_conf"
 CPP2, "run_second_cpp"
 COMMENTS, "keep_comments_cpp"
+DEPEND, "depend_mode"
 DIR, "cache_dir"
+DEBUG, "debug"
 DIRECT, "direct_mode"
 DISABLE, "disable"
 EXTENSION, "cpp_extension"
@@ -32,6 +38,7 @@ MEMCACHED_CONF, "memcached_conf"
 MEMCACHED_ONLY, "memcached_only"
 NLEVELS, "cache_dir_levels"
 PATH, "path"
+PCH_EXTSUM, "pch_external_checksum"
 PREFIX, "prefix_command"
 PREFIX_CPP, "prefix_command_cpp"
 READONLY, "read_only"
@@ -42,4 +49,3 @@ SLOPPINESS, "sloppiness"
 STATS, "stats"
 TEMPDIR, "temporary_dir"
 UMASK, "umask"
-UNIFY, "unify"

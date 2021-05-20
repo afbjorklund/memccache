@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2018 Joel Rosdahl
+// Copyright (C) 2010-2020 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -60,8 +60,8 @@ TEST(args_init_from_gcc_atfile)
 {
 	struct args *args;
 	const char *argtext =
-	  "first\rsec\\\tond\tthi\\\\rd\nfourth  \tfif\\ th \"si'x\\\" th\""
-	  " 'seve\nth'\\";
+		"first\rsec\\\tond\tthi\\\\rd\nfourth  \tfif\\ th \"si'x\\\" th\""
+		" 'seve\nth'\\";
 
 	create_file("gcc_atfile", argtext);
 
@@ -74,11 +74,7 @@ TEST(args_init_from_gcc_atfile)
 	CHECK_STR_EQ("fourth", args->argv[3]);
 	CHECK_STR_EQ("fif th", args->argv[4]);
 	CHECK_STR_EQ("si'x\" th", args->argv[5]);
-#ifndef _WIN32
 	CHECK_STR_EQ("seve\nth", args->argv[6]);
-#else
-	CHECK_STR_EQ("seve\r\nth", args->argv[6]);
-#endif
 	CHECK(!args->argv[7]);
 	args_free(args);
 }
@@ -198,13 +194,13 @@ TEST(args_insert)
 	CHECK_INT_EQ(9, args->argc);
 	args_insert(args, 1, src5, false);
 	CHECK_STR_EQ_FREE2(
-	  "first one alpha beta gamma second beta gamma fourth fifth",
-	  args_to_string(args));
+		"first one alpha beta gamma second beta gamma fourth fifth",
+		args_to_string(args));
 	CHECK_INT_EQ(10, args->argc);
 	args_insert(args, 1, src6, false);
 	CHECK_STR_EQ_FREE2(
-	  "first one alpha beta gamma second beta gamma fourth fifth",
-	  args_to_string(args));
+		"first one alpha beta gamma second beta gamma fourth fifth",
+		args_to_string(args));
 	CHECK_INT_EQ(10, args->argc);
 
 	args_free(args);

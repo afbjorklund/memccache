@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2016 Joel Rosdahl
+// Copyright (C) 2010-2019 Joel Rosdahl
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License as published by the Free
@@ -15,6 +15,8 @@
 // Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
 #include "ccache.h"
+
+#include "language.h"
 
 // Supported file extensions and corresponding languages (as in parameter to
 // the -x option).
@@ -60,32 +62,7 @@ static const struct {
 	{".HXX", "c++-header"},
 	{".tcc", "c++-header"},
 	{".TCC", "c++-header"},
-	{".cu",  "cuda"},
-	{".ic",  "cuda-output"},
-	// Fixed form Fortran without preprocessing:
-	{".f",   "f77"},
-	{".for", "f77"},
-	{".ftn", "f77"},
-	// Fixed form Fortran with traditional preprocessing:
-	{".F",   "f77-cpp-input"},
-	{".FOR", "f77-cpp-input"},
-	{".fpp", "f77-cpp-input"},
-	{".FPP", "f77-cpp-input"},
-	{".FTN", "f77-cpp-input"},
-	// Free form Fortran without preprocessing:
-#if 0 // Could generate modules, ignore for now!
-	{".f90", "f95"},
-	{".f95", "f95"},
-	{".f03", "f95"},
-	{".f08", "f95"},
-#endif
-	// Free form Fortran with traditional preprocessing:
-#if 0 // Could generate modules, ignore for now!
-	{".F90", "f95-cpp-input"},
-	{".F95", "f95-cpp-input"},
-	{".F03", "f95-cpp-input"},
-	{".F08", "f95-cpp-input"},
-#endif
+	{".cu",  "cu"},
 	{NULL,  NULL}
 };
 
@@ -100,6 +77,7 @@ static const struct {
 	{"c++",                      "c++-cpp-output"},
 	{"c++-cpp-output",           "c++-cpp-output"},
 	{"c++-header",               "c++-cpp-output"},
+	{"cu",                       "cpp-output"},
 	{"objective-c",              "objective-c-cpp-output"},
 	{"objective-c-header",       "objective-c-cpp-output"},
 	{"objc-cpp-output",          "objective-c-cpp-output"},
@@ -108,15 +86,8 @@ static const struct {
 	{"objc++-cpp-output",        "objective-c++-cpp-output"},
 	{"objective-c++-header",     "objective-c++-cpp-output"},
 	{"objective-c++-cpp-output", "objective-c++-cpp-output"},
-	{"cuda",                     "cuda-output"},
 	{"assembler-with-cpp",       "assembler"},
 	{"assembler",                "assembler"},
-	{"f77-cpp-input",            "f77"},
-	{"f77",                      "f77"},
-#if 0 // Could generate module files, ignore for now!
-	{"f95-cpp-input",            "f95"},
-	{"f95",                      "f95"},
-#endif
 	{NULL,  NULL}
 };
 
@@ -174,5 +145,7 @@ language_is_supported(const char *language)
 bool
 language_is_preprocessed(const char *language)
 {
-	return str_eq(language, p_language_for_language(language));
+	const char *p_language = p_language_for_language(language);
+	assert(p_language);
+	return str_eq(language, p_language);
 }
