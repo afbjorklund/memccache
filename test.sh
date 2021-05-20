@@ -1576,6 +1576,27 @@ EOF
     else
         test_failed "unexpected output of --dump-manifest"
     fi
+
+    ##################################################################
+    testname="argument-less -B and -L"
+    $CCACHE -Cz > /dev/null
+    cat <<EOF >test.c
+#include <stdio.h>
+int main(void)
+{
+#ifdef FOO
+    puts("FOO");
+#endif
+    return 0;
+}
+EOF
+
+    $CCACHE $COMPILER -A -L -DFOO -c test.c
+    checkstat 'cache hit (direct)' 0
+    checkstat 'cache miss' 1
+    $CCACHE $COMPILER -A -L -DBAR -c test.c
+    checkstat 'cache hit (direct)' 0
+    checkstat 'cache miss' 2
 }
 
 basedir_suite() {
@@ -2620,6 +2641,91 @@ b"
 b"
 }
 
+buggy_cpp_suite() {
+    testname="buggy_cpp"
+    $CCACHE -Cz >/dev/null
+    cat >buggy-cpp <<EOF
+#!/bin/sh
+CCACHE_DISABLE=1 # If $COMPILER happens to be a ccache symlink...
+export CCACHE_DISABLE
+if echo "\$*" | grep -- -D >/dev/null; then
+  $COMPILER "\$@"
+else
+  # mistreat the preprocessor output in the same way as gcc6 does
+  $COMPILER "\$@" |
+    sed -e '/^# 1 "<command-line>"$/ a # 31 "<command-line>"' \\
+        -e 's/^# 1 "<command-line>" 2$/# 32 "<command-line>" 2/'
+fi
+exit 0
+EOF
+    cat <<'EOF' >file.c
+int foo;
+EOF
+    chmod +x buggy-cpp
+    backdate buggy-cpp
+    $CCACHE ./buggy-cpp -c file.c
+    checkstat 'cache hit (direct)' 0
+    checkstat 'cache hit (preprocessed)' 0
+    checkstat 'cache miss' 1
+    $CCACHE ./buggy-cpp -DNOT_AFFECTING=1 -c file.c
+    checkstat 'cache hit (direct)' 0
+    checkstat 'cache hit (preprocessed)' 1
+    checkstat 'cache miss' 1
+}
+
+symlinks_suite() {
+    ##################################################################
+    testname="symlink to source directory"
+
+    mkdir dir
+    cd dir
+    mkdir -p d1/d2
+    echo '#define A "OK"' >d1/h.h
+    cat <<EOF >d1/d2/c.c
+#include <stdio.h>
+#include "../h.h"
+int main() { printf("%s\n", A); }
+EOF
+    echo '#define A "BUG"' >h.h
+    ln -s d1/d2 d3
+
+    CCACHE_BASEDIR=/ $CCACHE $COMPILER -c $PWD/d3/c.c
+    $COMPILER -c $PWD/d3/c.c
+    $COMPILER c.o -o c
+    result=$(./c)
+    if [ "$result" != OK ]; then
+        test_failed "Incorrect header file used"
+    fi
+
+    cd ..
+    rm -rf dir
+
+    ##################################################################
+    testname="symlink to source file"
+
+    mkdir dir
+    cd dir
+    mkdir d
+    echo '#define A "BUG"' >d/h.h
+    cat <<EOF >d/c.c
+#include <stdio.h>
+#include "h.h"
+int main() { printf("%s\n", A); }
+EOF
+    echo '#define A "OK"' >h.h
+    ln -s d/c.c c.c
+
+    CCACHE_BASEDIR=/ $CCACHE $COMPILER -c $PWD/c.c
+    $COMPILER c.o -o c
+    result=$(./c)
+    if [ "$result" != OK ]; then
+        test_failed "Incorrect header file used"
+    fi
+
+    cd ..
+    rm -rf dir
+}
+
 ######################################################################
 # main program
 
@@ -2743,8 +2849,10 @@ extrafiles
 ignoreheaders
 cleanup
 pch
+symlinks
 upgrade
 prefix
+buggy_cpp
 "
 
 if [ ! -z $CCACHE_MEMCACHED ]; then

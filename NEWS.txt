@@ -1,57 +1,67 @@
 ccache news
 ===========
 
-
-Unreleased 3.3
---------------
-
-New features and improvements
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-- Added support for cuda including the -optf/--options-file option.
-
-- Added new sloppiness option `no_system_headers`, which tells ccache not to
-  include system headers in manifest files.
-
-- Multiple identical `-arch` arguments are now handled without bailing.
-
-- Added new `ignore_headers_in_manifest` configuration option, which specifies
-  headers that should be ignored in the direct mode.
-
-- Added new `prefix_command_cpp` (`CCACHE_PREFIX_CPP`) configuration option,
-  which specifies one or several prefixes to add to the command line ccache
-  uses when invoking the preprocessor.
-
-- The concatenated form of some long compiler options is now recognized, for
-  example when using `-isystemPATH` instead of `-isystem PATH`.
-
-- If hard-linking is enabled and but fails (e.g. due to cross-device linking),
-  ccache now falls back to copying instead of running the compiler.
-
-- Made the `hash_dir` option only have effect when generating debug info.
-
-- Added support for relocating debug info directory using `-fdebug-prefix-map`.
-  This allows for cache hits even when `hash_dir` is used in combination with
-  `base_dir`.
-
-- Added new `keep_comments_cpp` (`CCACHE_COMMENTS`) configuration option, which
-  tells ccache not to discard the comments before hashing preprocessor output.
-  This can be used to check documentation with *-Wdocumentation*.
-
-- ccache now knows how to convert absolute paths to relative paths inside
-  dependency files when using `base_dir`.
-
+ccache 3.2.9
+----------------
+Release date: 2016-09-28
 
 Bug fixes
 ~~~~~~~~~
 
-- Fixed clang test suite when running on Linux.
+- Fixed a regression in ccache 3.2.8: ccache could get confused when using the
+  compiler option `-Wp,` to pass multiple options to the preprocessor,
+  resulting in missing dependency files from direct mode cache hits.
 
-- Fixed build and test for MinGW32 and Windows.
+
+ccache 3.2.8
+------------
+Release date: 2016-09-07
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed an issue when compiler option `-Wp,-MT,path` is used instead of `-MT
+  path` (and similar for `-MF`, `-MP` and `-MQ`) and `run_second_cpp`
+  (`CCACHE_CPP2`) is enabled.
+
+- ccache now understands the undocumented `-coverage` (only one dash) GCC
+  option.
 
 
-Unreleased ccache 3.2.5
------------------------
+ccache 3.2.7
+------------
+Release date: 2016-07-20
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed a bug which could lead to false cache hits for compiler command lines
+  with a missing argument to an option that takes an argument.
+
+- ccache now knows how to work around a glitch in the output of GCC 6's
+  preprocessor.
+
+
+ccache 3.2.6
+------------
+Release date: 2016-07-12
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed build problem on QNX, which lacks ``SA_RESTART''.
+
+- Bail out on compiler option `-fstack-usage` since it creates a `.su` file
+  which ccache currently doesn't handle.
+
+- Fixed a bug where (due to ccache rewriting paths) the compiler could choose
+  incorrect include files if `CCACHE_BASEDIR` is used and the source file path
+  is absolute and is a symlink.
+
+
+ccache 3.2.5
+------------
+Release date: 2016-04-17
 
 New features and improvements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,6 +69,9 @@ New features and improvements
 - Only pass clang-specific `-stdlib=` to the preprocessor.
 
 - Improved handling of stale NFS handles.
+
+- Made it harder to misinterpret documentation of boolean environment settings'
+  semantics.
 
 
 Bug fixes
@@ -82,6 +95,9 @@ Bug fixes
 - Fixed bug in hashing of clang plugins, leading to unnecessary cache misses.
 
 - Fixed --print-config to show ``pch_defines sloppiness''.
+
+- The man page is now built when running ``make install'' from Git repository
+  sources.
 
 
 ccache 3.2.4
@@ -314,6 +330,19 @@ Bug fixes
 - Fixed race condition when creating the initial cache directory.
 
 - Fixed test suite failures when `CC` is a ccache-wrapped compiler.
+
+
+ccache 3.1.12
+-------------
+Release date: 2016-07-12
+
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed a bug where (due to ccache rewriting paths) the compiler could choose
+  incorrect include files if `CCACHE_BASEDIR` is used and the source file path
+  is absolute and is a symlink.
 
 
 ccache 3.1.11

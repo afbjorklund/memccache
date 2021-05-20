@@ -36,6 +36,7 @@ static const struct compopt compopts[] = {
 	{"--save-temps",    TOO_HARD},
 	{"--serialize-diagnostics", TAKES_ARG | TAKES_PATH},
 	{"-A",              TAKES_ARG},
+	{"-B",              TAKES_ARG | TAKES_CONCAT_ARG},
 	{"-D",              AFFECTS_CPP | TAKES_ARG | TAKES_CONCAT_ARG},
 	{"-E",              TOO_HARD},
 	{"-F",              AFFECTS_CPP | TAKES_ARG | TAKES_CONCAT_ARG | TAKES_PATH},
@@ -60,6 +61,7 @@ static const struct compopt compopts[] = {
 	{"-fno-working-directory", AFFECTS_CPP},
 	{"-fplugin=libcc1plugin", TOO_HARD}, /* interaction with GDB */
 	{"-frepo",          TOO_HARD},
+	{"-fstack-usage",   TOO_HARD},
 	{"-fworking-directory", AFFECTS_CPP},
 	{"-idirafter",      AFFECTS_CPP | TAKES_ARG | TAKES_CONCAT_ARG | TAKES_PATH},
 	{"-iframework",     AFFECTS_CPP | TAKES_ARG | TAKES_CONCAT_ARG | TAKES_PATH},
