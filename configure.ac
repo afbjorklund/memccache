@@ -3,7 +3,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT()
 AC_PREREQ(2.52)
 
-AC_MSG_NOTICE([Configuring ccache])
+AC_MSG_NOTICE([configuring ccache])
 
 AC_CONFIG_HEADER(config.h)
 
@@ -22,8 +22,14 @@ AC_SUBST(extra_libs)
 AC_SUBST(include_dev_mk)
 AC_SUBST(test_suites)
 
+m4_include(m4/feature_macros.m4)
+
 dnl Checks for programs.
-AC_PROG_CC
+AC_PROG_CC_C99
+if test "$ac_cv_prog_cc_c99" = no; then
+    AC_MSG_ERROR(cannot find a C99-compatible compiler)
+fi
+
 AC_PROG_CPP
 AC_PROG_INSTALL
 AC_PROG_RANLIB
@@ -32,7 +38,8 @@ if test -z "$AR"; then
     AC_MSG_ERROR(cannot find ar)
 fi
 
-m4_include(m4/feature_macros.m4)
+# Prefer bash, needed for test.sh
+AC_PATH_TOOL(BASH, bash, "/bin/bash")
 
 # If GCC, turn on warnings.
 if test "x$GCC" = "xyes"; then
@@ -43,7 +50,6 @@ fi
 
 AC_HEADER_DIRENT
 AC_HEADER_TIME
-AC_HEADER_STDBOOL
 AC_HEADER_SYS_WAIT
 
 AC_CHECK_TYPES(long long)
@@ -157,9 +163,9 @@ else
 fi
 
 if test x${use_bundled_zlib} = xyes; then
-    CPPFLAGS="$CPPFLAGS -I\$(srcdir)/zlib"
-    extra_libs="zlib/libz.a"
-    mkdir -p zlib
+    CPPFLAGS="$CPPFLAGS -I\$(srcdir)/src/zlib"
+    extra_libs="src/zlib/libz.a"
+    mkdir -p src/zlib
 else
     LIBS="$LIBS -lz"
 fi
@@ -193,24 +199,26 @@ if test "$ac_cv_c_extern_inline" != no ; then
               Define to 1 if your compiler supports extern inline)
 fi
 
+mkdir -p .deps src unittest
+
 dnl Enable developer mode if dev.mk.in exists.
 if test ! -f $srcdir/dev_mode_disabled && test "$RUN_FROM_BUILD_FARM" != yes; then
-    AC_MSG_NOTICE(Developer mode enabled)
+    AC_MSG_NOTICE(developer mode enabled)
     AC_CONFIG_FILES([dev.mk])
     include_dev_mk='include dev.mk'
     version=`(git --git-dir=$srcdir/.git describe --dirty 2>/dev/null || echo vunknown) | sed -e 's/v//' -e 's/-/+/' -e 's/-/_/g'`
-    echo "const char CCACHE_VERSION@<:@@:>@ = \"$version\";" >version.c
+    echo "const char CCACHE_VERSION@<:@@:>@ = \"$version\";" >src/version.c
 else
-    AC_MSG_NOTICE(Developer mode disabled)
+    AC_MSG_NOTICE(developer mode disabled)
 fi
 
-if test ! -f $srcdir/version.c; then
+if test ! -f $srcdir/src/version.c -a ! -f src/version.c ; then
     AC_MSG_WARN(unable to determine ccache version)
-    echo "const char CCACHE_VERSION@<:@@:>@ = \"unknown\";" >version.c
+    echo "const char CCACHE_VERSION@<:@@:>@ = \"unknown\";" >src/version.c
 fi
 
 dnl Find test suite files.
-test_suites=`ls $srcdir/test/test_*.c | egrep -v 'BASE|BACKUP|LOCAL|REMOTE' | xargs echo`
+test_suites=`cd $srcdir && ls unittest/test_*.c | egrep -v 'BASE|BACKUP|LOCAL|REMOTE' | xargs echo`
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
@@ -222,8 +230,5 @@ EOF
 cat config.h >>config.h.tmp
 echo '#endif' >>config.h.tmp
 mv config.h.tmp config.h
-
-mkdir -p .deps test
-
 
 AC_MSG_NOTICE(now build ccache by running make)
