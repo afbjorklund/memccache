@@ -5,15 +5,14 @@
 #include <libcouchbase/couchbase.h>
 
 /* couchbase instance */
-static lcb_t cb = NULL;
+static lcb_INSTANCE * cb = NULL;
 
-static void storage_callback(lcb_t instance,
-                             const void *cookie, lcb_storage_t op,
-                             lcb_error_t err, const lcb_store_resp_t *resp);
+static void store_callback(lcb_INSTANCE * instance, int cbtype,
+                           const lcb_RESPBASE *rb);
 
-static void get_callback(lcb_t instance,
-                         const void *cookie, lcb_error_t err,
-                         const lcb_get_resp_t *resp);
+static void get_callback(lcb_INSTANCE * instance, int cbtype,
+                         const lcb_RESPBASE *rb);
+
 
 typedef struct cc_blob {
 	void *data;
@@ -22,79 +21,114 @@ typedef struct cc_blob {
 
 int cc_couchbase_init(char *conf)
 {
-	struct lcb_create_st cropts = { 0 };
-	cropts.version = 3;
-	cropts.v.v3.connstr = conf; /* "couchbase://localhost/default" */
-	lcb_error_t err;
+	const char *username = getenv("CCACHE_COUCHBASE_USERNAME");
+	const char *password = getenv("CCACHE_COUCHBASE_PASSWORD"); /* Note: unsafe */
+	lcb_STATUS err;
 
-	err = lcb_create(&cb, &cropts);
+	lcb_CREATEOPTS *cropts;
+	err = lcb_createopts_create(&cropts, LCB_TYPE_BUCKET);
 	if (err != LCB_SUCCESS) {
-		cc_log("Couldn't create instance: %s",
-		       lcb_strerror(NULL, err));
+		cc_log("Couldn't create createopts: %s",
+		       lcb_strerror_short(err));
 		return err;
 	}
 
+	/* conf = "couchbase://localhost/default" */
+	lcb_createopts_connstr(cropts, conf, strlen(conf));
+	if (username && password) {
+		lcb_createopts_credentials(cropts,
+		                           username, strlen(username),
+		                           password, strlen(password));
+	}
+
+	err = lcb_create(&cb, cropts);
+	if (err != LCB_SUCCESS) {
+		cc_log("Couldn't create instance: %s",
+		       lcb_strerror_short(err));
+		return err;
+	}
+
+	lcb_createopts_destroy(cropts);
+
 	lcb_connect(cb);
-	lcb_wait(cb);
+	lcb_wait(cb, LCB_WAIT_DEFAULT);
 	err = lcb_get_bootstrap_status(cb);
 	if (err != LCB_SUCCESS) {
 		cc_log("Couldn't bootstrap: %s",
-		       lcb_strerror(NULL, err));
+		       lcb_strerror_short(err));
 		return err;
 	}
 
-	lcb_set_store_callback(cb, storage_callback);
-	lcb_set_get_callback(cb, get_callback);
+	lcb_install_callback(cb, LCB_CALLBACK_STORE, store_callback);
+	lcb_install_callback(cb, LCB_CALLBACK_GET, get_callback);
+	lcb_install_callback(cb, LCB_CALLBACK_REMOVE, remove_callback);
 
 	return 0;
 }
 
-void storage_callback(lcb_t instance, const void *cookie, lcb_storage_t op,
-                      lcb_error_t err, const lcb_store_resp_t *resp)
+static void store_callback(lcb_INSTANCE * instance, int cbtype,
+                           const lcb_RESPBASE *rb)
 {
-	(void) instance; (void) cookie; (void) op;
+	const lcb_RESPSTORE *resp = (const lcb_RESPSTORE*)rb;
+	(void) instance; (void) cbtype;
+	lcb_STATUS err = lcb_respstore_status(resp);
 	if (err == LCB_SUCCESS) {
-		cc_log("CB Stored %.*s", (int)resp->v.v0.nkey, (char *)resp->v.v0.key);
+		size_t nkey;
+		const char *key;
+		lcb_respstore_key(resp, &key, &nkey);
+		cc_log("CB Stored %.*s", (int)nkey, (char *)key);
 	} else {
-		cc_log("CB Fail %s", lcb_strerror(NULL, err));
+		cc_log("CB Fail %s", lcb_strerror_short(err));
 	}
 }
 
 int cc_couchbase_set(const char *key, const char *type, const char *data,
                      size_t len)
 {
-	lcb_store_cmd_t scmd = { 0 };
-	const lcb_store_cmd_t *scmdlist = &scmd;
-	lcb_error_t err;
+	lcb_CMDSTORE* scmd;
+	lcb_STATUS err;
 	char *buf;
 	if (cb == NULL)
 		return -1;
 	buf = format("%s.%s", key, type);
-	scmd.v.v0.key = buf;
-	scmd.v.v0.nkey = strlen(buf);
-	scmd.v.v0.bytes = data;
-	scmd.v.v0.nbytes = len;
-	scmd.v.v0.operation = LCB_SET;
-	err = lcb_store(cb, NULL, 1, &scmdlist);
+	lcb_cmdstore_create(&scmd, LCB_STORE_UPSERT);
+	lcb_cmdstore_key(scmd, buf, strlen(buf));
+	lcb_cmdstore_value(scmd, data, len);
+	err = lcb_store(cb, NULL, scmd);
 	if (err != LCB_SUCCESS) {
 		cc_log("Couldn't schedule storage operation!");
+		//cc_log("CB err %s", lcb_strerror_long(err));
 		return err;
 	}
-	lcb_wait(cb); //storage_callback is invoked here
+	lcb_wait(cb, LCB_WAIT_NOCHECK); //storage_callback is invoked here
 	free(buf);
 	return 0;
 }
 
-void get_callback(lcb_t instance, const void *cookie, lcb_error_t err,
-                  const lcb_get_resp_t *resp)
+void get_callback(lcb_INSTANCE * instance, int cbtype,
+                         const lcb_RESPBASE *rb)
 {
-	(void) instance;
+	const lcb_RESPGET *resp = (const lcb_RESPGET*)rb;
+	void *cookie;
+	lcb_respget_cookie(resp, &cookie);
+	(void) instance; (void) cbtype;
+	lcb_STATUS err = lcb_respget_status(resp);
 	if (err == LCB_SUCCESS) {
-		cc_log("CB Retrieved %.*s", (int)resp->v.v0.nkey, (char *)resp->v.v0.key);
-		((cc_blob_t *) cookie)->data = (void *) resp->v.v0.bytes;
-		((cc_blob_t *) cookie)->len = resp->v.v0.nbytes;
+		size_t nkey;
+		const char *key;
+		lcb_respget_key(resp, &key, &nkey);
+		cc_log("CB Retrieved %.*s", (int)nkey, (char *)key);
+		size_t nbytes;
+		const char *bytes;
+		lcb_respget_value(resp, &bytes, &nbytes);
+		((cc_blob_t *) cookie)->data = (void *) bytes;
+		((cc_blob_t *) cookie)->len = nbytes;
 	} else if (cookie) {
-		cc_log("CB Miss %.*s", (int)resp->v.v0.nkey, (char *)resp->v.v0.key);
+		size_t nkey;
+		const char *key;
+		lcb_respget_key(resp, &key, &nkey);
+		cc_log("CB Miss %.*s", (int)nkey, (char *)key);
+		//cc_log("CB err %s", lcb_strerror_long(err));
 		((cc_blob_t *) cookie)->data = NULL;
 		((cc_blob_t *) cookie)->len = 0;
 	}
@@ -104,21 +138,20 @@ int cc_couchbase_get(const char *key, const char *type, char **data,
                      size_t *len)
 {
 	cc_blob_t blob;
-	lcb_get_cmd_t gcmd = { 0 };
-	const lcb_get_cmd_t *gcmdlist = &gcmd;
-	lcb_error_t err;
+	lcb_CMDGET* gcmd;
+	lcb_STATUS err;
 	char *buf;
 	if (cb == NULL)
 		return -1;
 	buf = format("%s.%s", key, type);
-	gcmd.v.v0.key = buf;
-	gcmd.v.v0.nkey = strlen(buf);
-	err = lcb_get(cb, &blob, 1, &gcmdlist);
+	lcb_cmdget_create(&gcmd);
+	lcb_cmdget_key(gcmd, buf, strlen(buf));
+	err = lcb_get(cb, &blob, gcmd);
 	if (err != LCB_SUCCESS) {
 		cc_log("Couldn't schedule get operation!");
 		return err;
 	}
-	lcb_wait(cb); // get_callback is invoked here
+	lcb_wait(cb, LCB_WAIT_NOCHECK); // get_callback is invoked here
 	free(buf);
 
 	*data = blob.data;
