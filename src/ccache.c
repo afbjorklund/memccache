@@ -1527,33 +1527,6 @@ update_cached_result_globals(struct file_hash *hash)
 static void
 to_fscache(struct args *args, struct hash *depend_mode_hash)
 {
-	char *tmp_cov;
-	char *tmp_dwo = NULL;
-
-	if (generating_coverage) {
-		char *tmp_aux;
-		/* gcc has some funny rule about max extension length */
-		if (strlen(get_extension(output_obj)) < 6) {
-			tmp_aux = remove_extension(output_obj);
-		} else {
-			tmp_aux = x_strdup(output_obj);
-		}
-		tmp_cov = format("%s.gcno", tmp_aux);
-		free(tmp_aux);
-	} else {
-		tmp_cov = NULL;
-	}
-
-	/* GCC (at least 4.8 and 4.9) forms the .dwo file name by removing everything
-	 * after (and including) the last "." from the object file name and then
-	 * appending ".dwo".
-	 */
-	if (using_split_dwarf) {
-		char *base_name = remove_extension(output_obj);
-		tmp_dwo = format("%s.dwo", base_name);
-		free(base_name);
-	}
-
 	args_add(args, "-o");
 	args_add(args, output_obj);
 
@@ -1914,8 +1887,6 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 
 	free(tmp_stderr);
 	free(tmp_stdout);
-	free(tmp_cov);
-	free(tmp_dwo);
 }
 
 #ifdef HAVE_LIBMEMCACHED
@@ -3850,59 +3821,6 @@ cc_process_args(struct args *args,
 			output_dia = make_relative_path(x_strdup(argv[i+1]));
 			i++;
 			continue;
-		}
-
-		if (str_startswith(argv[i], "-fprofile-")) {
-			char *arg = x_strdup(argv[i]);
-			const char *arg_profile_dir = strchr(argv[i], '=');
-			if (arg_profile_dir) {
-				// Convert to absolute path.
-				char *dir = x_realpath(arg_profile_dir + 1);
-				if (!dir) {
-					// Directory doesn't exist.
-					dir = x_strdup(arg_profile_dir + 1);
-				}
-
-				// We can get a better hit rate by using the real path here.
-				free(arg);
-				char *option = x_strndup(argv[i], arg_profile_dir - argv[i]);
-				arg = format("%s=%s", option, dir);
-				cc_log("Rewriting %s to %s", argv[i], arg);
-				free(option);
-				free(dir);
-			}
-
-			bool supported_profile_option = false;
-			if (str_startswith(argv[i], "-fprofile-generate")
-			    || str_eq(argv[i], "-fprofile-arcs")) {
-				profile_generate = true;
-				supported_profile_option = true;
-			} else if (str_startswith(argv[i], "-fprofile-use")
-			           || str_eq(argv[i], "-fbranch-probabilities")) {
-				profile_use = true;
-				supported_profile_option = true;
-			} else if (str_eq(argv[i], "-fprofile-dir")) {
-				supported_profile_option = true;
-			}
-
-			if (supported_profile_option) {
-				//args_add(stripped_args, arg);
-				free(arg);
-
-				// If the profile directory has already been set, give up... Hard to
-				// know what the user means, and what the compiler will do.
-				if (arg_profile_dir && profile_path) {
-					cc_log("Profile directory already set; giving up");
-					result = false;
-					goto out;
-				} else if (arg_profile_dir) {
-					cc_log("Setting profile directory to %s", arg_profile_dir);
-					profile_path = x_strdup(arg_profile_dir);
-				}
-				continue;
-			}
-			cc_log("Unknown profile option: %s", argv[i]);
-			free(arg);
 		}
 
 		if (str_eq(argv[i], "-fcolor-diagnostics")
