@@ -20,6 +20,7 @@ case $host in
 esac
 
 AC_SUBST(ccache_memcached)
+AC_SUBST(ccache_couchbase)
 AC_SUBST(disable_man)
 AC_SUBST(extra_libs)
 AC_SUBST(extra_sources)
@@ -140,6 +141,23 @@ if test x${enable_memcached} != xno; then
     exit 1
     ])
     ccache_memcached='CCACHE_MEMCACHED=1 '
+fi
+
+AC_ARG_ENABLE(couchbase,
+  [AS_HELP_STRING([--enable-couchbase],
+    [enable couchbase as a cache backend])])
+
+dnl enable-couchbase: Check if -lcouchbase is needed.
+if test x${enable_couchbase} == xyes; then
+    if test x${enable_static} != x; then
+        AC_CHECK_LIB(stdc++, __gxx_personality_v0,[])
+    fi
+    AC_CHECK_LIB(couchbase, lcb_get_version,[],[
+    echo '  WARNING: recent version libcouchbase not found'
+    echo '  please install libcouchbase>2.4 with development files'
+    exit 1
+    ])
+    ccache_couchbase='CCACHE_COUCHBASE=1 '
 fi
 
 dnl Check for zlib

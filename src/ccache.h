@@ -219,7 +219,6 @@ double time_seconds(void);
 
 // ----------------------------------------------------------------------------
 // memccached.c
-
 int memccached_init(char *conf);
 int memccached_raw_set(const char *key, const char* data, size_t len);
 int memccached_set(
@@ -233,6 +232,13 @@ void* memccached_get(
 	size_t *out_len, size_t *err_len, size_t *dia_len, size_t *dep_len);
 void memccached_free(void *blob);
 int memccached_release(void);
+
+// ----------------------------------------------------------------------------
+// couchbase.c
+int cc_couchbase_init(char *conf);
+int cc_couchbase_set(const char *key, const char *type, const char* data, size_t len);
+int cc_couchbase_get(const char *key, const char *type, char **data, size_t *len);
+int cc_couchbase_release(void);
 
 // ----------------------------------------------------------------------------
 // stats.c

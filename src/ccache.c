@@ -1433,7 +1433,7 @@ send_cached_stderr(void)
 static void
 update_manifest_file(void)
 {
-#ifdef HAVE_LIBMEMCACHED
+#if defined(HAVE_LIBMEMCACHED) || defined(HAVE_LIBCOUCHBASE)
 	char *data;
 	size_t size;
 #endif
@@ -1471,6 +1471,15 @@ update_manifest_file(void)
 			    read_file(manifest_path, st.st_size, &data, &size)) {
 				cc_log("Storing %s in memcached", manifest_name);
 				memccached_raw_set(manifest_name, data, size);
+				free(data);
+			}
+#endif
+#if HAVE_LIBCOUCHBASE
+			if (strlen(conf->couchbase_conf) > 0 &&
+			    read_file(manifest_path, st.st_size, &data, &size)) {
+				cc_log("Storing %s in couchbase", manifest_name);
+				cc_couchbase_set(manifest_name, "manifest", data, size);
+				free(data);
 			}
 #endif
 		}
@@ -1502,6 +1511,33 @@ update_cached_result_globals(struct file_hash *hash)
 static void
 to_fscache(struct args *args, struct hash *depend_mode_hash)
 {
+	char *tmp_cov;
+	char *tmp_dwo = NULL;
+
+	if (generating_coverage) {
+		char *tmp_aux;
+		/* gcc has some funny rule about max extension length */
+		if (strlen(get_extension(output_obj)) < 6) {
+			tmp_aux = remove_extension(output_obj);
+		} else {
+			tmp_aux = x_strdup(output_obj);
+		}
+		tmp_cov = format("%s.gcno", tmp_aux);
+		free(tmp_aux);
+	} else {
+		tmp_cov = NULL;
+	}
+
+	/* GCC (at least 4.8 and 4.9) forms the .dwo file name by removing everything
+	 * after (and including) the last "." from the object file name and then
+	 * appending ".dwo".
+	 */
+	if (using_split_dwarf) {
+		char *base_name = remove_extension(output_obj);
+		tmp_dwo = format("%s.dwo", base_name);
+		free(base_name);
+	}
+
 	args_add(args, "-o");
 	args_add(args, output_obj);
 
@@ -1791,12 +1827,39 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 		free(data_dep);
 	}
 #endif
+#ifdef HAVE_LIBCOUCHBASE
+	char *data;
+	size_t size;
+	if (strlen(conf->couchbase_conf) > 0 &&
+	    !using_split_dwarf && /* no support for the dwo files just yet */
+	    !generating_coverage) { /* coverage refers to local paths anyway */
+		cc_log("Storing %s in couchbase", cached_key);
+		if (read_file(cached_obj, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "o", data, size);
+			free(data);
+		}
+		if (read_file(cached_stderr, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "stderr", data, size);
+			free(data);
+		}
+		if (output_dia && read_file(cached_dia, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "dia", data, size);
+			free(data);
+		}
+		if (generating_dependencies && read_file(cached_dep, 0, &data, &size)) {
+			cc_couchbase_set(cached_key, "d", data, size);
+			free(data);
+		}
+	}
+#endif
 	// Everything OK.
 	send_cached_stderr();
 	update_manifest_file();
 
 	free(tmp_stderr);
 	free(tmp_stdout);
+	free(tmp_cov);
+	free(tmp_dwo);
 }
 
 #ifdef HAVE_LIBMEMCACHED
@@ -2408,8 +2471,8 @@ static struct file_hash *
 calculate_object_hash(struct args *args, struct args *preprocessor_args,
                       struct hash *hash, int direct_mode)
 {
-#if HAVE_LIBMEMCACHED
-	char *data;
+#if defined(HAVE_LIBMEMCACHED) || defined(HAVE_LIBCOUCHBASE)
+	char *data = NULL;
 	size_t size;
 #endif
 	bool found_ccbin = false;
@@ -2643,6 +2706,7 @@ calculate_object_hash(struct args *args, struct args *preprocessor_args,
 			conf->direct_mode = false;
 			return NULL;
 		}
+
 		manifest_name = hash_result(hash);
 		manifest_path = get_path_in_cache(manifest_name, ".manifest");
 		manifest_stats_file =
@@ -2664,6 +2728,17 @@ calculate_object_hash(struct args *args, struct args *preprocessor_args,
 				write_file(data, manifest_path, size);
 				stats_update_size(stats_file, size, 1);
 				free(cache);
+			} else
+#endif
+#if HAVE_LIBCOUCHBASE
+			if (strlen(conf->couchbase_conf) > 0) {
+				cc_log("Getting %s from couchbase", manifest_name);
+				cc_couchbase_get(manifest_name, "manifest", &data, &size);
+			}
+			if (data) {
+				cc_log("Added object file hash to %s", manifest_path);
+				write_file(data, manifest_path, size);
+				stats_update_size(stats_file, size, 1);
 			} else
 #endif
 			return NULL;
@@ -2719,6 +2794,10 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 	char *data_obj, *data_stderr, *data_dia, *data_dep;
 	size_t size_obj, size_stderr, size_dia, size_dep;
 #endif
+#if HAVE_LIBCOUCHBASE
+	char *data;
+	size_t size;
+#endif
 
 	// The user might be disabling cache hits.
 	if (conf->recache) {
@@ -2752,6 +2831,25 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 				put_data_in_cache(data_dep, size_dep, cached_dep);
 			}
 			memccached_free(cache);
+		}
+#endif
+#if HAVE_LIBCOUCHBASE
+		if (strlen(conf->couchbase_conf) > 0 &&
+		    !using_split_dwarf &&
+		    !generating_coverage) {
+			cc_log("Getting %s from couchbase", cached_key);
+			if (!cc_couchbase_get(cached_key, "o", &data, &size)) {
+				write_file(data, cached_obj, size);
+			}
+			if (!cc_couchbase_get(cached_key, "stderr", &data, &size)) {
+				write_file(data, cached_stderr, size);
+			}
+			if (!cc_couchbase_get(cached_key, "dia", &data, &size)) {
+				write_file(data, cached_dia, size);
+			}
+			if (!cc_couchbase_get(cached_key, "d", &data, &size)) {
+				write_file(data, cached_dep, size);
+			}
 		}
 #endif
 	}
@@ -3691,6 +3789,59 @@ cc_process_args(struct args *args,
 			continue;
 		}
 
+		if (str_startswith(argv[i], "-fprofile-")) {
+			char *arg = x_strdup(argv[i]);
+			const char *arg_profile_dir = strchr(argv[i], '=');
+			if (arg_profile_dir) {
+				// Convert to absolute path.
+				char *dir = x_realpath(arg_profile_dir + 1);
+				if (!dir) {
+					// Directory doesn't exist.
+					dir = x_strdup(arg_profile_dir + 1);
+				}
+
+				// We can get a better hit rate by using the real path here.
+				free(arg);
+				char *option = x_strndup(argv[i], arg_profile_dir - argv[i]);
+				arg = format("%s=%s", option, dir);
+				cc_log("Rewriting %s to %s", argv[i], arg);
+				free(option);
+				free(dir);
+			}
+
+			bool supported_profile_option = false;
+			if (str_startswith(argv[i], "-fprofile-generate")
+			    || str_eq(argv[i], "-fprofile-arcs")) {
+				profile_generate = true;
+				supported_profile_option = true;
+			} else if (str_startswith(argv[i], "-fprofile-use")
+			           || str_eq(argv[i], "-fbranch-probabilities")) {
+				profile_use = true;
+				supported_profile_option = true;
+			} else if (str_eq(argv[i], "-fprofile-dir")) {
+				supported_profile_option = true;
+			}
+
+			if (supported_profile_option) {
+				//args_add(stripped_args, arg);
+				free(arg);
+
+				// If the profile directory has already been set, give up... Hard to
+				// know what the user means, and what the compiler will do.
+				if (arg_profile_dir && profile_path) {
+					cc_log("Profile directory already set; giving up");
+					result = false;
+					goto out;
+				} else if (arg_profile_dir) {
+					cc_log("Setting profile directory to %s", arg_profile_dir);
+					profile_path = x_strdup(arg_profile_dir);
+				}
+				continue;
+			}
+			cc_log("Unknown profile option: %s", argv[i]);
+			free(arg);
+		}
+
 		if (str_eq(argv[i], "-fcolor-diagnostics")
 		    || str_eq(argv[i], "-fno-color-diagnostics")
 		    || str_eq(argv[i], "-fdiagnostics-color")
@@ -4393,6 +4544,11 @@ initialize(void)
 		to_cache = to_memcached;
 	}
 #endif
+#ifdef HAVE_LIBCOUCHBASE
+	if (strlen(conf->couchbase_conf) > 0) {
+		cc_couchbase_init(conf->couchbase_conf);
+	}
+#endif
 	exitfn_init();
 	exitfn_add_nullary(stats_flush);
 	exitfn_add_nullary(clean_up_pending_tmp_files);
@@ -4483,6 +4639,9 @@ cc_reset(void)
 
 #ifdef HAVE_LIBMEMCACHED
 	memccached_release();
+#endif
+#ifdef HAVE_LIBCOUCHBASE
+	cc_couchbase_release();
 #endif
 
 	conf = conf_create();

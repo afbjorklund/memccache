@@ -364,6 +364,15 @@ WRAPPERS>>.
     to 6, and must be no lower than 1 (fastest, worst compression) and no
     higher than 9 (slowest, best compression).
 
+*couchbase_conf* (*CCACHE_COUCHBASE_CONF*)::
+
+    The couchbase_conf option sets the libcouchbase configuration to use
+    for storing and getting cache values, if any. Example configuration:
++
+-------------------------------------------------------------------------------
+CCACHE_COUCHBASE_CONF=couchbase://localhost/default
+-------------------------------------------------------------------------------
+
 *cpp_extension* (*CCACHE_EXTENSION*)::
 
     This setting can be used to force a certain extension for the intermediate

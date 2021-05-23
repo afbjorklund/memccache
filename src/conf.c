@@ -140,6 +140,7 @@ conf_create(void)
 	conf->compiler_check = x_strdup("mtime");
 	conf->compression = false;
 	conf->compression_level = 6;
+	conf->couchbase_conf = x_strdup("");
 	conf->cpp_extension = x_strdup("");
 	conf->debug = false;
 	conf->depend_mode = false;
@@ -186,6 +187,7 @@ conf_free(struct conf *conf)
 	free(conf->cache_dir);
 	free(conf->compiler);
 	free(conf->compiler_check);
+	free(conf->couchbase_conf);
 	free(conf->cpp_extension);
 	free(conf->extra_files_to_hash);
 	free(conf->ignore_headers_in_manifest);
@@ -421,6 +423,7 @@ conf_print_items(struct conf *conf,
 	ok &= print_item(conf, "compiler_check", printer, context);
 	ok &= print_item(conf, "compression", printer, context);
 	ok &= print_item(conf, "compression_level", printer, context);
+	ok &= print_item(conf, "couchbase_conf", printer, context);
 	ok &= print_item(conf, "cpp_extension", printer, context);
 	ok &= print_item(conf, "debug", printer, context);
 	ok &= print_item(conf, "depend_mode", printer, context);

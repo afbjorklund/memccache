@@ -427,9 +427,15 @@ if [ ! -z $CCACHE_MEMCACHED ]; then
     all_suites="$all_suites
 memcached
 memcached_only
-memcached_socket
+memcached_socket !win32
 "
 fi
+if [ ! -z $CCACHE_COUCHBASE ]; then
+    all_suites="$all_suites
+couchbase
+"
+fi
+
 for suite in $all_suites; do
     . $(dirname $0)/suites/$suite.bash
 done

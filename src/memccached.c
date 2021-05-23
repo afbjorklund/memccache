@@ -17,6 +17,10 @@ static memcached_st *memc;
 
 int memccached_init(char *conf)
 {
+	const char *username = getenv("CCACHE_MEMCACHED_USERNAME"); /* Note: bucket */
+	const char *password = getenv("CCACHE_MEMCACHED_PASSWORD"); /* Note: unsafe */
+	memcached_return_t ret;
+
 	memc = memcached(conf, strlen(conf));
 	if (!memc) {
 		char errorbuf[1024];
@@ -28,6 +32,20 @@ int memccached_init(char *conf)
 	   added to the cluster with minimal cache losses */
 	memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_DISTRIBUTION,
 	                       MEMCACHED_DISTRIBUTION_CONSISTENT);
+	if (username && password) {
+		/* the username to use for couchbase is the name of the bucket */
+		ret = memcached_set_sasl_auth_data(memc, username, password);
+		if (memcached_failed(ret)) {
+			if (ret == MEMCACHED_NOT_SUPPORTED) {
+				cc_log("Unsupported SASL authentication");
+			} else {
+				cc_log("%s", memcached_last_error_message(memc));
+			}
+			return -1;
+		}
+		/* SASL authentication requires the binary protocol (not ascii) */
+		memcached_behavior_set(memc, MEMCACHED_BEHAVIOR_BINARY_PROTOCOL, true);
+	}
 	return 0;
 }
 
@@ -93,6 +111,11 @@ static memcached_return_t memccached_big_set(memcached_st *ptr,
 		                    expiration, flags);
 		free(s);
 		if (ret) {
+			memcached_server_instance_st instance;
+
+			instance = memcached_server_instance_by_position(memc, 0);
+			cc_log("%s %s", memcached_last_error_message(memc),
+			                memcached_server_error(instance));
 			cc_log("Failed to set key in memcached: %s",
 			       memcached_strerror(memc, ret));
 			return ret;
