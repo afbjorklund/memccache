@@ -14,8 +14,21 @@ previous compilations and detecting when the same compilation is being done
 again. Supported languages are C, C++, Objective-C and Objective-C++.
 
 memcached is a high-performance, distributed memory object caching system.
-It can be complimented with moxi proxy <https://github.com/couchbase/moxi>
-and couchbase server <https://couchbase.com/memcached-replacement>.
+It can be complimented with `moxi` memcached proxy <https://github.com/couchbase/moxi>
+and couchbase server <https://www.couchbase.com/server>.
+
+Couchbase (optional)
+--------------------
+
+It is possible to use `moxi` memcached proxy and the Couchbase Server,<br />
+by changing the memcached and the couchbase configuration of memccache.
+
+See <https://couchbase.com/memcached-replacement> for the details:
+
+![couchbase memcached](images/couchbase-memcached-replacement.png)
+
+Both moxi and couchbase are Open Source, and have a "community edition".<br />
+Any other server compatible with memcached would also work for memccache.
 
 * <https://docs.couchbase.com/server/5.0/install/ubuntu-debian-install.html>
 * tested with `couchbase-server-community_5.0.1-5003-1_amd64.deb`
