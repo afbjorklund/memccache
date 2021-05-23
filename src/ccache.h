@@ -231,6 +231,7 @@ void* memccached_get(
 	char **out, char **err, char **dia, char **dep,
 	size_t *out_len, size_t *err_len, size_t *dia_len, size_t *dep_len);
 void memccached_free(void *blob);
+int memccached_rm(const char *key);
 int memccached_release(void);
 
 // ----------------------------------------------------------------------------
@@ -238,6 +239,7 @@ int memccached_release(void);
 int cc_couchbase_init(char *conf);
 int cc_couchbase_set(const char *key, const char *type, const char* data, size_t len);
 int cc_couchbase_get(const char *key, const char *type, char **data, size_t *len);
+int cc_couchbase_rm(const char *key, const char *type);
 int cc_couchbase_release(void);
 
 // ----------------------------------------------------------------------------

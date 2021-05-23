@@ -355,9 +355,22 @@ int memccached_set(const char *key,
 static void *memccached_prune(const char *key)
 {
 	cc_log("key from memcached has wrong data %s: pruning...", key);
+	memccached_rm(key);
 	/* don't really care whether delete failed */
-	memcached_delete(memc, key, strlen(key), 0);
 	return NULL;
+}
+
+int memccached_rm(const char *key)
+{
+	memcached_return_t mret;
+
+	mret = memcached_delete(memc, key, strlen(key), 0);
+	if (mret != MEMCACHED_SUCCESS) {
+		cc_log("Failed to remove %s from memcached: %s", key,
+		       memcached_strerror(memc, mret));
+		return -1;
+	}
+	return 0;
 }
 
 void *memccached_raw_get(const char *key, char **data, size_t *size)

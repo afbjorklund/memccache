@@ -13,6 +13,9 @@ static void store_callback(lcb_INSTANCE * instance, int cbtype,
 static void get_callback(lcb_INSTANCE * instance, int cbtype,
                          const lcb_RESPBASE *rb);
 
+static void remove_callback(lcb_INSTANCE * instance, int cbtype,
+                            const lcb_RESPBASE *rb);
+
 
 typedef struct cc_blob {
 	void *data;
@@ -156,6 +159,45 @@ int cc_couchbase_get(const char *key, const char *type, char **data,
 
 	*data = blob.data;
 	*len = blob.len;
+	return 0;
+}
+
+void remove_callback(lcb_INSTANCE * instance, int cbtype,
+                         const lcb_RESPBASE *rb)
+{
+	const lcb_RESPREMOVE *resp = (const lcb_RESPREMOVE*)rb;
+	(void) instance; (void) cbtype;
+	lcb_STATUS err = lcb_respremove_status(resp);
+	if (err == LCB_SUCCESS) {
+		size_t nkey;
+		const char *key;
+		lcb_respremove_key(resp, &key, &nkey);
+		cc_log("CB Removed %.*s", (int)nkey, (char *)key);
+	} else {
+		size_t nkey;
+		const char *key;
+		lcb_respremove_key(resp, &key, &nkey);
+		cc_log("CB Remove %.*s", (int)nkey, (char *)key);
+		//cc_log("CB err %s", lcb_strerror_long(err));
+	}
+}
+
+int cc_couchbase_rm(const char *key, const char *type)
+{
+	lcb_CMDREMOVE* rcmd;
+	lcb_STATUS err;
+	char *buf;
+	if (cb == NULL)
+		return -1;
+	buf = format("%s.%s", key, type);
+	lcb_cmdremove_create(&rcmd);
+	lcb_cmdremove_key(rcmd, buf, strlen(buf));
+	err = lcb_remove(cb, NULL, rcmd);
+	if (err != LCB_SUCCESS) {
+		cc_log("Couldn't schedule remove operation!");
+		return err;
+	}
+	lcb_wait(cb, LCB_WAIT_NOCHECK); // remove_callback is invoked here
 	return 0;
 }
 

@@ -1457,6 +1457,22 @@ update_manifest_file(void)
 		(conf->sloppiness & SLOPPY_FILE_STAT_MATCHES)
 		|| output_is_precompiled_header;
 
+	if (getenv("CCACHE_REMOVE")) {
+		x_unlink(manifest_path);
+#if HAVE_LIBMEMCACHED
+			if (strlen(conf->memcached_conf) > 0 && !conf->read_only_memcached) {
+				cc_log("Removing %s from memcached", manifest_name);
+				memccached_rm(manifest_name);
+			}
+#endif
+#if HAVE_LIBCOUCHBASE
+			if (strlen(conf->couchbase_conf) > 0) {
+				cc_couchbase_rm(manifest_name, "manifest");
+			}
+#endif
+		return;
+	}
+
 	MTR_BEGIN("manifest", "manifest_put");
 	if (manifest_put(manifest_path, cached_obj_hash, included_files,
 	                 save_timestamp)) {
@@ -1733,6 +1749,44 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 	}
 	if (st.st_size == 0 || conf->depend_mode) {
 		tmp_unlink(tmp_stderr);
+	}
+
+	if (getenv("CCACHE_REMOVE")) {
+		if (produce_dep_file) {
+			x_unlink(cached_dep);
+		}
+		if (generating_coverage) {
+			x_unlink(cached_cov);
+		}
+		if (generating_stackusage) {
+			x_unlink(cached_su);
+		}
+		if (generating_diagnostics) {
+			x_unlink(cached_dia);
+		}
+		if (using_split_dwarf) {
+			x_unlink(cached_dwo);
+		}
+		x_unlink(cached_stderr);
+		x_unlink(cached_obj);
+#ifdef HAVE_LIBMEMCACHED
+		cc_log("Removing %s from memcached", cached_key);
+		memccached_rm(cached_key);
+#endif
+#ifdef HAVE_LIBCOUCHBASE
+		if (produce_dep_file) {
+			cc_couchbase_rm(cached_key, "d");
+		}
+		if (generating_diagnostics) {
+			cc_couchbase_rm(cached_key, "dia");
+		}
+		if (using_split_dwarf) {
+			cc_couchbase_rm(cached_key, "dwo");
+		}
+		cc_couchbase_rm(cached_key, "o");
+		cc_couchbase_rm(cached_key, "stderr");
+#endif
+		return;
 	}
 
 	MTR_BEGIN("file", "file_put");
@@ -2046,7 +2100,10 @@ to_memcached(struct args *args, struct hash *depend_mode_hash)
 		}
 	}
 
-	{
+	if (getenv("CCACHE_REMOVE")) {
+		cc_log("Removing %s in memcached only", cached_key);
+		memccached_rm(cached_key);
+	} else {
 		cc_log("Storing %s in memcached only", cached_key);
 		if (memccached_set(cached_key, obj_d, stderr_d, dia_d, dep_d,
 			           obj_l, stderr_l, dia_l, dep_l) < 0) {
