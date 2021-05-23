@@ -2046,38 +2046,38 @@ to_memcached(struct args *args, struct hash *depend_mode_hash)
 		}
 	}
 
-	if (memccached_set(cached_key, obj_d, stderr_d, dia_d, dep_d,
-	                   obj_l, stderr_l, dia_l, dep_l) < 0) {
-		stats_update(STATS_ERROR);
-		failed();
-	}
-
-	cc_log("Storing %s in memcached", cached_key);
-
-	stats_update(STATS_CACHEMISS);
-
-	/* Make sure we have a CACHEDIR.TAG in the cache part of cache_dir. This can
-	 * be done almost anywhere, but we might as well do it near the end as we
-	 * save the stat call if we exit early.
-	 */
 	{
-		char *first_level_dir = dirname(stats_file);
-		if (create_cachedirtag(first_level_dir) != 0) {
-			cc_log("Failed to create %s/CACHEDIR.TAG (%s)\n",
-			       first_level_dir, strerror(errno));
+		cc_log("Storing %s in memcached only", cached_key);
+		if (memccached_set(cached_key, obj_d, stderr_d, dia_d, dep_d,
+			           obj_l, stderr_l, dia_l, dep_l) < 0) {
 			stats_update(STATS_ERROR);
 			failed();
 		}
-		free(first_level_dir);
-
-		/* Remove any CACHEDIR.TAG on the cache_dir level where it was located in
-		 * previous ccache versions. */
-		if (getpid() % 1000 == 0) {
-			char *path = format("%s/CACHEDIR.TAG", conf->cache_dir);
-			x_unlink(path);
-			free(path);
-		}
 	}
+
+	stats_update(STATS_CACHEMISS);
+
+        // Make sure we have a CACHEDIR.TAG in the cache part of cache_dir. This can
+        // be done almost anywhere, but we might as well do it near the end as we
+        // save the stat call if we exit early.
+        {
+                char *first_level_dir = dirname(stats_file);
+                if (create_cachedirtag(first_level_dir) != 0) {
+                        cc_log("Failed to create %s/CACHEDIR.TAG (%s)\n",
+                               first_level_dir, strerror(errno));
+                        stats_update(STATS_ERROR);
+                        failed();
+                }
+                free(first_level_dir);
+
+                // Remove any CACHEDIR.TAG on the cache_dir level where it was located in
+                // previous ccache versions.
+                if (getpid() % 1000 == 0) {
+                        char *path = format("%s/CACHEDIR.TAG", conf->cache_dir);
+                        x_unlink(path);
+                        free(path);
+                }
+        }
 
 	/* Everything OK. */
 	send_cached_stderr();
