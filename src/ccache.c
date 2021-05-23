@@ -2730,6 +2730,8 @@ calculate_object_hash(struct args *args, struct args *preprocessor_args,
 				write_file(data, manifest_path, size);
 				stats_update_size(stats_file, size, 1);
 				free(cache);
+				data = NULL;
+				size = 0;
 			} else
 #endif
 #if HAVE_LIBCOUCHBASE
