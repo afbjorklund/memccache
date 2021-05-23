@@ -762,6 +762,9 @@ create_cachedirtag(const char *dir)
 		errno = EEXIST;
 		goto error;
 	}
+	if (create_dir(dir)) {
+		goto error;
+	}
 	FILE *f = fopen(filename, "w");
 	if (!f) {
 		goto error;
