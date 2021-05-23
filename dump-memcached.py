@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from pymemcache.client.base import Client
 from pymemcache.client.hash import HashClient
@@ -23,11 +23,10 @@ import binascii
 
 */
 """
-MEMCCACHE_MAGIC = 'CCH1'
+MEMCCACHE_MAGIC = b'CCH1'
 
 def get_blob(token):
     return token[4:4+struct.unpack('!I', val[0:4])[0]]
-MEMCCACHE_BIG = 'CCBM'
 
 """
 /* blob format for big values:
@@ -46,7 +45,7 @@ MEMCCACHE_BIG = 'CCBM'
 
 */
 """
-MEMCCACHE_BIG = 'CCBM'
+MEMCCACHE_BIG = b'CCBM'
 
 server = os.getenv("MEMCACHED_SERVERS", "localhost")
 if ',' in server:
@@ -81,7 +80,7 @@ if val[0:4] == MEMCCACHE_BIG:
         subkey = "%s-%d" % (binascii.hexlify(md4), size)
         subval = mc.get(subkey)
         if not subval:
-            print "%s not found" % subkey
+            print("%s not found" % subkey)
         buf = buf + subval
     val = buf
 if val:
@@ -97,8 +96,8 @@ if val:
         dep = get_blob(val)
         val = val[4+len(dep):]
         assert len(val) == 0
-        print "%s: %d %d %d %d" % (key, len(obj), len(stderr), len(dia), len(dep))
+        print("%s: %d %d %d %d" % (key, len(obj), len(stderr), len(dia), len(dep)))
     else:
-        print "wrong magic"
+        print("wrong magic")
 else:
-    print "key missing"
+    print("key missing")

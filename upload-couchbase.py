@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import couchbase
 import os
@@ -37,15 +37,15 @@ for mtime, dirpath, filename in filelist:
             if ext == '.manifest':
                 manifest = manifest + 1
             key = "".join(list(os.path.split(dirname)) + [filename])
-            val = open(os.path.join(dirpath, filename)).read() or None
+            val = open(os.path.join(dirpath, filename), 'rb').read() or None
             if val:
-                print "%s: %d" % (key, len(val))
+                print("%s: %d" % (key, len(val)))
                 try:
                     from couchbase_core._libcouchbase import FMT_BYTES # format missing ?
                     bucket.upsert(key, val, format=FMT_BYTES)
                     docs = docs + 1
                 except couchbase.exceptions.TooBigException:
-                    print "# TOO BIG! (%dM)" % (len(val) >> 20)
+                    print("# TOO BIG! (%dM)" % (len(val) >> 20))
                     toobig = toobig + 1
             files = files + 1
-print "%d files, %d objects (%d manifest) = %d docs (%d toobig)" % (files, objects, manifest, docs, toobig)
+print("%d files, %d objects (%d manifest) = %d docs (%d toobig)" % (files, objects, manifest, docs, toobig))

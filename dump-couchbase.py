@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import couchbase
 import sys
@@ -13,7 +13,7 @@ bucket = Bucket(config, username=username, password=password)
 key = sys.argv[1]
 val = bucket.get(key, quiet=True, no_format=True)
 if val.value:
-    print "%s: %d" % (key, len(val.value))
+    print("%s: %d" % (key, len(val.value)))
 
 else:
-    print "key missing"
+    print("key missing")
