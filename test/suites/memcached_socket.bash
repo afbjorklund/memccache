@@ -1,9 +1,10 @@
 SUITE_memcached_socket_SETUP() {
     generate_code 1 test1.c
+
+    export CCACHE_MEMCACHED_CONF=--SOCKET=\"/tmp/memcached.$$\"
 }
 
 SUITE_memcached_socket() {
-    export CCACHE_MEMCACHED_CONF=--SOCKET=\"/tmp/memcached.$$\"
     memcached -s /tmp/memcached.$$ &
     memcached_pid=$!
     base_tests

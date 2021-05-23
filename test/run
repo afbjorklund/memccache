@@ -427,12 +427,17 @@ if [ ! -z $CCACHE_MEMCACHED ]; then
     all_suites="$all_suites
 memcached
 memcached_only
-memcached_socket !win32
 "
+    if ! $HOST_OS_WINDOWS; then
+    all_suites="$all_suites
+memcached_socket
+"
+    fi
 fi
 if [ ! -z $CCACHE_COUCHBASE ]; then
     all_suites="$all_suites
 couchbase
+moxi
 "
 fi
 

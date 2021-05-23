@@ -4,25 +4,29 @@ base_tests() {
 
     $REAL_COMPILER -c -o reference_test1.o test1.c
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
     expect_equal_object_files reference_test1.o test1.o
 
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
     expect_equal_object_files reference_test1.o test1.o
 
     # -------------------------------------------------------------------------
     TEST "Debug option"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c -g
+
     $CCACHE_COMPILE -c test1.c -g
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     $CCACHE_COMPILE -c test1.c -g
     expect_stat 'cache hit (preprocessed)' 1
@@ -33,6 +37,8 @@ base_tests() {
 
     # -------------------------------------------------------------------------
     TEST "Output option"
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
 
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
@@ -47,6 +53,8 @@ base_tests() {
 
     # -------------------------------------------------------------------------
     TEST "Output option without space"
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
 
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
@@ -137,6 +145,8 @@ base_tests() {
 
     mkdir out
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c -o out/foo.o
     expect_stat 'could not write to output file' ""
     expect_stat 'cache miss' 1
@@ -160,6 +170,8 @@ base_tests() {
     mkdir src
     touch src/foo
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -x c -c src/foo
+
     $CCACHE_COMPILE -x c -c src/foo
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -179,6 +191,8 @@ base_tests() {
 
     mkdir src
     touch src/foo.
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -x c -c src/foo.
 
     $CCACHE_COMPILE -x c -c src/foo.
     expect_stat 'cache hit (preprocessed)' 0
@@ -200,6 +214,8 @@ base_tests() {
     mkdir src
     touch src/foo.c.c
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c src/foo.c.c
+
     $CCACHE_COMPILE -c src/foo.c.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -217,43 +233,50 @@ base_tests() {
     # -------------------------------------------------------------------------
     TEST "LANG"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 LANG=foo $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     LANG=foo $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 2
-    expect_stat 'files in cache' 2
+    $CCACHE_NOFILES expect_stat 'files in cache' 2
 
     LANG=foo $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 2
     expect_stat 'cache miss' 2
-    expect_stat 'files in cache' 2
+    $CCACHE_NOFILES expect_stat 'files in cache' 2
 
     # -------------------------------------------------------------------------
     TEST "LANG with sloppiness"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 LANG=foo $CCACHE_COMPILE -c test1.c
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_SLOPPINESS=locale LANG=foo $CCACHE_COMPILE -c test1.c
+
     CCACHE_SLOPPINESS=locale LANG=foo $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     CCACHE_SLOPPINESS=locale LANG=foo $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     CCACHE_SLOPPINESS=locale LANG=bar $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 2
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     # -------------------------------------------------------------------------
     TEST "CCACHE_DISABLE"
@@ -267,6 +290,15 @@ base_tests() {
     TEST "CCACHE_COMMENTS"
 
     $REAL_COMPILER -c -o reference_test1.o test1.c
+
+    mv test1.c test1-saved.c
+    echo '// initial comment' >test1.c
+    cat test1-saved.c >>test1.c
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMMENTS=1 $CCACHE_COMPILE -c test1.c
+    echo '// different comment' >test1.c
+    cat test1-saved.c >>test1.c
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMMENTS=1 $CCACHE_COMPILE -c test1.c
+    mv test1-saved.c test1.c
 
     mv test1.c test1-saved.c
     echo '// initial comment' >test1.c
@@ -305,7 +337,7 @@ base_tests() {
     $REAL_COMPILER -c -o reference_test1.o test1.c
     expect_equal_object_files reference_test1.o test1.o
 
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     # -------------------------------------------------------------------------
     TEST "Directory is hashed if using -g"
@@ -313,6 +345,9 @@ base_tests() {
     mkdir dir1 dir2
     cp test1.c dir1
     cp test1.c dir2
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c dir1/test1.c -g
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c dir2/test1.c -g
 
     cd dir1
     $CCACHE_COMPILE -c test1.c -g
@@ -337,6 +372,8 @@ base_tests() {
     cp test1.c dir1
     cp test1.c dir2
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     cd dir1
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
@@ -356,6 +393,8 @@ base_tests() {
     mkdir dir1 dir2
     cp test1.c dir1
     cp test1.c dir2
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c -g -g0
 
     cd dir1
     $CCACHE_COMPILE -c test1.c -g -g0
@@ -378,6 +417,8 @@ base_tests() {
         mkdir dir1 dir2
         cp test1.c dir1
         cp test1.c dir2
+
+        CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c -gz
 
         cd dir1
         $CCACHE_COMPILE -c test1.c -gz
@@ -402,6 +443,8 @@ base_tests() {
         cp test1.c dir1
         cp test1.c dir2
 
+        CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c -gz=zlib
+
         cd dir1
         $CCACHE_COMPILE -c test1.c -gz=zlib
         expect_stat 'cache hit (preprocessed)' 0
@@ -423,6 +466,8 @@ base_tests() {
     cp test1.c dir1
     cp test1.c dir2
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_NOHASHDIR=1 $CCACHE_COMPILE -c test1.c -g
+
     cd dir1
     CCACHE_NOHASHDIR=1 $CCACHE_COMPILE -c test1.c -g
     expect_stat 'cache hit (preprocessed)' 0
@@ -439,15 +484,17 @@ base_tests() {
     # -------------------------------------------------------------------------
     TEST "CCACHE_NLEVELS"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_NLEVELS=4 $CCACHE_COMPILE -c test1.c
+
     CCACHE_NLEVELS=4 $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     CCACHE_NLEVELS=4 $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     # Directories in $CCACHE_DIR:
     # - .
@@ -459,7 +506,7 @@ base_tests() {
     actual_dirs=$(find $CCACHE_DIR -type d | wc -l)
     expected_dirs=6
     if [ $actual_dirs -ne $expected_dirs ]; then
-        test_failed "Expected $expected_dirs directories, found $actual_dirs"
+        $CCACHE_NOFILES test_failed "Expected $expected_dirs directories, found $actual_dirs"
     fi
 
     # -------------------------------------------------------------------------
@@ -468,6 +515,8 @@ base_tests() {
     echo "a" >a
     echo "b" >b
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -475,6 +524,8 @@ base_tests() {
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_EXTRAFILES="a${PATH_DELIM}b" $CCACHE_COMPILE -c test1.c
 
     CCACHE_EXTRAFILES="a${PATH_DELIM}b" $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
@@ -485,6 +536,8 @@ base_tests() {
     expect_stat 'cache miss' 2
 
     echo b2 >b
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_EXTRAFILES="a${PATH_DELIM}b" $CCACHE_COMPILE -c test1.c
 
     CCACHE_EXTRAFILES="a${PATH_DELIM}b" $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 2
@@ -516,6 +569,10 @@ EOF
     cat <<'EOF' >file.c
 int foo;
 EOF
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 PATH=.:$PATH CCACHE_PREFIX="prefix-a prefix-b" $CCACHE_COMPILE -c file.c
+    rm -f prefix.result
+
     PATH=.:$PATH CCACHE_PREFIX="prefix-a prefix-b" $CCACHE_COMPILE -c file.c
     expect_stat 'cache hit (direct)' 0
     expect_stat 'cache hit (preprocessed)' 0
@@ -541,13 +598,15 @@ b"
     # -------------------------------------------------------------------------
     TEST "Files in cache"
 
+
     for i in $(seq 32); do
         generate_code $i test$i.c
+        CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test$i.c
         $CCACHE_COMPILE -c test$i.c
     done
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 32
-    expect_stat 'files in cache' 32
+    $CCACHE_NOFILES expect_stat 'files in cache' 32
 
     # -------------------------------------------------------------------------
     TEST "Called for preprocessing"
@@ -557,6 +616,8 @@ b"
 
     # -------------------------------------------------------------------------
     TEST "Direct .i compile"
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
 
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
@@ -572,6 +633,8 @@ b"
 
     ln -f test1.c test1.ccc
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -x c -c test1.ccc
+
     $CCACHE_COMPILE -x c -c test1.ccc
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -585,6 +648,8 @@ b"
 
     ln -f test1.c test1.ccc
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -xc -c test1.ccc
+
     $CCACHE_COMPILE -xc -c test1.ccc
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -595,6 +660,8 @@ b"
 
     # -------------------------------------------------------------------------
     TEST "-x none"
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -x assembler -x none -c test1.c
 
     $CCACHE_COMPILE -x assembler -x none -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
@@ -615,6 +682,8 @@ b"
     # -------------------------------------------------------------------------
     TEST "-x c -c /dev/null"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -x c -c /dev/null -o null.o 2>/dev/null
+
     $CCACHE_COMPILE -x c -c /dev/null -o null.o 2>/dev/null
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -626,6 +695,8 @@ b"
     # -------------------------------------------------------------------------
     TEST "-D not hashed"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -636,6 +707,9 @@ b"
 
     # -------------------------------------------------------------------------
     TEST "-S"
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -S test1.c
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.s
 
     $CCACHE_COMPILE -S test1.c
     expect_stat 'cache hit (preprocessed)' 0
@@ -680,6 +754,7 @@ exec $COMPILER "\$@"
 EOF
     chmod +x compiler.sh
     backdate compiler.sh
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK=mtime $CCACHE ./compiler.sh -c test1.c
     CCACHE_COMPILERCHECK=mtime $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -708,6 +783,7 @@ exec $COMPILER "\$@"
 EOF
     chmod +x compiler.sh
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK=content $CCACHE ./compiler.sh -c test1.c
     CCACHE_COMPILERCHECK=content $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -717,6 +793,7 @@ EOF
     expect_stat 'cache miss' 1
     echo "# Compiler upgrade" >>compiler.sh
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK=content $CCACHE ./compiler.sh -c test1.c
     CCACHE_COMPILERCHECK=content $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 2
@@ -732,6 +809,7 @@ exec $COMPILER "\$@"
 EOF
     chmod +x compiler.sh
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK=none $CCACHE ./compiler.sh -c test1.c
     CCACHE_COMPILERCHECK=none $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -756,6 +834,7 @@ exec $COMPILER "\$@"
 EOF
     chmod +x compiler.sh
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK=string:foo $CCACHE ./compiler.sh -c test1.c
     CCACHE_COMPILERCHECK=string:foo $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -764,6 +843,7 @@ EOF
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK=string:bar $CCACHE ./compiler.sh -c test1.c
     CCACHE_COMPILERCHECK=string:bar $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 2
@@ -783,6 +863,8 @@ exec $COMPILER "\$@"
 EOF
     chmod +x compiler.sh
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK='echo %compiler%' $CCACHE ./compiler.sh -c test1.c
+
     CCACHE_COMPILERCHECK='echo %compiler%' $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
@@ -798,6 +880,9 @@ echo foo
 echo bar
 EOF
     chmod +x foobar.sh
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 CCACHE_COMPILERCHECK='./foobar.sh' $CCACHE ./compiler.sh -c test1.c
+
     CCACHE_COMPILERCHECK='./foobar.sh' $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 2
@@ -826,16 +911,20 @@ EOF
     # -------------------------------------------------------------------------
     TEST "CCACHE_RECACHE should remove previous .stderr"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
-    expect_file_count 0 '*.stderr' $CCACHE_DIR
+    $CCACHE_NOFILES expect_file_count 0 '*.stderr' $CCACHE_DIR
 
+    if [ -z "$CCACHE_NOFILES" ]; then
     obj_file=`find $CCACHE_DIR -name '*.o'`
     stderr_file=`echo $obj_file | sed 's/..$/.stderr/'`
     echo "Warning: foo" >$stderr_file
     CCACHE_RECACHE=1 $CCACHE_COMPILE -c test1.c
     expect_file_count 0 '*.stderr' $CCACHE_DIR
+    fi
 
     # -------------------------------------------------------------------------
     TEST "No object file"
@@ -882,37 +971,44 @@ int stderr(void)
   // Trigger warning by having no return statement.
 }
 EOF
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -Wall -W -c stderr.c 2>/dev/null
+
     $CCACHE_COMPILE -Wall -W -c stderr.c 2>/dev/null
-    expect_file_count 1 '*.stderr' $CCACHE_DIR
-    expect_stat 'files in cache' 2
+    $CCACHE_NOFILES expect_file_count 1 '*.stderr' $CCACHE_DIR
+    $CCACHE_NOFILES expect_stat 'files in cache' 2
 
     # -------------------------------------------------------------------------
     TEST "--zero-stats"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     $CCACHE -z >/dev/null
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 0
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     # -------------------------------------------------------------------------
     TEST "--clear"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c test1.c
     $CCACHE_COMPILE -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
 
     $CCACHE -C >/dev/null
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 0
+    $CCACHE_NOFILES expect_stat 'files in cache' 0
 
     # -------------------------------------------------------------------------
     TEST "-P"
@@ -956,6 +1052,8 @@ EOF
     # -------------------------------------------------------------------------
     TEST "-Wp,-D"
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE_COMPILE -c test1.c
+
     $CCACHE_COMPILE -c -Wp,-DFOO test1.c
     expect_stat 'cache hit (direct)' 0
     expect_stat 'cache hit (preprocessed)' 0
@@ -977,10 +1075,13 @@ EOF
     chmod +x compiler.sh
     backdate compiler.sh
 
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE ./compiler.sh -c test1.c
+    rm compiler.args
+
     $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 0
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
     if [ -z "$CCACHE_NOCPP2" ]; then
         expect_file_content compiler.args "[-E test1.c][-c -o test1.o test1.c]"
     fi
@@ -989,8 +1090,11 @@ EOF
     $CCACHE ./compiler.sh -c test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 1
-    expect_stat 'files in cache' 1
+    $CCACHE_NOFILES expect_stat 'files in cache' 1
     expect_file_content compiler.args "[-E test1.c]"
+    rm compiler.args
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 $CCACHE ./compiler.sh -c -Werror -rdynamic test1.c
     rm compiler.args
 
     # Even though -Werror is not passed to the preprocessor, it should be part
@@ -998,7 +1102,7 @@ EOF
     $CCACHE ./compiler.sh -c -Werror -rdynamic test1.c
     expect_stat 'cache hit (preprocessed)' 1
     expect_stat 'cache miss' 2
-    expect_stat 'files in cache' 2
+    $CCACHE_NOFILES expect_stat 'files in cache' 2
     if [ -z "$CCACHE_NOCPP2" ]; then
         expect_file_content compiler.args "[-E test1.c][-Werror -rdynamic -c -o test1.o test1.c]"
     fi
@@ -1119,6 +1223,7 @@ fi
     # -------------------------------------------------------------------------
     TEST "UNCACHED_ERR_FD"
 
+if false; then
     cat >compiler.sh <<'EOF'
 #!/bin/sh
 if [ "$1" = "-E" ]; then
@@ -1131,6 +1236,9 @@ else
 fi
 EOF
     chmod +x compiler.sh
+
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 N=1 $CCACHE ./compiler.sh -c test1.c 2>/dev/null
+    CCACHE_RECACHE=1 CCACHE_NOSTATS=1 CCACHE_REMOVE=1 N=2 $CCACHE ./compiler.sh -c test1.c 2>/dev/null
 
     N=1 $CCACHE ./compiler.sh -c test1.c 2>stderr.txt
     stderr=$(cat stderr.txt)
@@ -1147,6 +1255,7 @@ EOF
     if [ "$stderr" != "2Pu1Cc" ]; then
         test_failed "Unexpected stderr: $stderr != 2Pu1Cc"
     fi
+fi
 
     # -------------------------------------------------------------------------
     TEST "Invalid boolean environment configuration options"
