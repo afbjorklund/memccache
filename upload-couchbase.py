@@ -14,6 +14,8 @@ filelist = []
 for dirpath, dirnames, filenames in os.walk(ccache):
     # sort by modification time, most recently used last
     for filename in filenames:
+        if filename.endswith('.lock'):
+            continue
         stat = os.stat(os.path.join(dirpath, filename))
         filelist.append((stat.st_mtime, dirpath, filename))
 filelist.sort()
