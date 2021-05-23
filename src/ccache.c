@@ -1839,7 +1839,9 @@ to_fscache(struct args *args, struct hash *depend_mode_hash)
 			free(data);
 		}
 		if (read_file(cached_stderr, 0, &data, &size)) {
-			cc_couchbase_set(cached_key, "stderr", data, size);
+			if (size > 0) {
+				cc_couchbase_set(cached_key, "stderr", data, size);
+			}
 			free(data);
 		}
 		if (output_dia && read_file(cached_dia, 0, &data, &size)) {
@@ -2842,7 +2844,9 @@ from_fscache(enum fromcache_call_mode mode, bool put_object_in_manifest)
 				write_file(data, cached_obj, size);
 			}
 			if (!cc_couchbase_get(cached_key, "stderr", &data, &size)) {
-				write_file(data, cached_stderr, size);
+				if (size > 0) {
+					write_file(data, cached_stderr, size);
+				}
 			}
 			if (!cc_couchbase_get(cached_key, "dia", &data, &size)) {
 				write_file(data, cached_dia, size);
