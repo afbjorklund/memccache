@@ -140,6 +140,7 @@ if test x${enable_memcached} != xno; then
     echo '  please install libmemcached > 1.0 with development files'
     exit 1
     ])
+    AC_CHECK_TYPES(memcached_server_instance_st)
     ccache_memcached='CCACHE_MEMCACHED=1 '
 fi
 

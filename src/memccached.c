@@ -111,7 +111,11 @@ static memcached_return_t memccached_big_set(memcached_st *ptr,
 		                    expiration, flags);
 		free(s);
 		if (ret) {
+#ifdef HAVE_MEMCACHED_SERVER_INSTANCE_ST
 			memcached_server_instance_st instance;
+#else
+			const memcached_instance_st *instance;
+#endif
 
 			instance = memcached_server_instance_by_position(memc, 0);
 			cc_log("%s %s", memcached_last_error_message(memc),
