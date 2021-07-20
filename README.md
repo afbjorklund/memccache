@@ -30,8 +30,11 @@ See <https://couchbase.com/memcached-replacement> for the details:
 Both moxi and couchbase are Open Source, and have a "community edition".<br />
 Any other server compatible with memcached would also work for memccache.
 
-* <https://docs.couchbase.com/server/5.0/install/ubuntu-debian-install.html>
-* tested with `couchbase-server-community_5.0.1-5003-1_amd64.deb`
+* <https://docs.couchbase.com/server/6.0/install/ubuntu-debian-install.html>
+* tested with `couchbase-server-community_6.0.0-1693-1_amd64.deb`
+
+NOTE: 6.0 is the _final_ release with moxi, it is not included anymore in 6.5<br />
+Newer versions of couchbase don't support memcached buckets, only JSON.
 
 General information
 -------------------
