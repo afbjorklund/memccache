@@ -17,6 +17,15 @@ memcached is a high-performance, distributed memory object caching system.
 It can be complimented with `moxi` memcached proxy <https://github.com/couchbase/moxi>
 and couchbase server <https://www.couchbase.com/server>.
 
+Maintenance (ccache)
+--------------------
+
+This _fork_ is based on the `3.7-maint` branch of ccache, which is written in C99.
+It includes support for memcached (and couchbase), and is using MD4 and LZ4.
+
+The new 4.x `master` of <https://github.com/ccache/ccache> has been ported to C++.
+It now instead has a storage backend for redis, and uses BLAKE3 and Zstandard.
+
 Couchbase (optional)
 --------------------
 
