@@ -98,6 +98,10 @@ def test(tmp_dir, options, compiler_args, source_file):
     environment["CCACHE_COMPILERCHECK"] = options.compilercheck
     if options.compression:
         environment["CCACHE_COMPRESS"] = "1"
+    if options.compression_type:
+        environment["CCACHE_COMPRESSTYPE"] = options.compression_type
+    if options.compression_level:
+        environment["CCACHE_COMPRESSLEVEL"] = str(options.compression_level)
     if options.nocpp2:
         environment["CCACHE_NOCPP2"] = "1"
     if options.hardlink:
@@ -263,6 +267,8 @@ def main(argv):
         "--compilercheck", help="specify compilercheck (default: mtime)"
     )
     op.add_option("--compression", help="use compression", action="store_true")
+    op.add_option("--compression-type", help="compression type")
+    op.add_option("--compression-level", help="compression level", type=int)
     op.add_option(
         "-d",
         "--directory",
@@ -330,6 +336,9 @@ def main(argv):
         )
         print("Compilercheck:", options.compilercheck)
         print("Compression:", on_off(options.compression))
+        if options.compression:
+            print("    Type:", options.compression_type or "gzip")
+            print("    Level:", options.compression_level or -1)
         print("Hardlink:", on_off(options.hardlink))
         print("Nocpp2:", on_off(options.nocpp2))
         print("Nostats:", on_off(options.nostats))

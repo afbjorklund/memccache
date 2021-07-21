@@ -302,7 +302,7 @@ static pid_t compiler_pid = 0;
 // different for the same input in a new ccache version, we can just change
 // this string. A typical example would be if the format of one of the files
 // stored in the cache changes in a backwards-incompatible way.
-static const char HASH_PREFIX[] = "3";
+static const char HASH_PREFIX[] = "4";
 
 static void from_fscache(enum fromcache_call_mode mode,
                          bool put_object_in_manifest);
@@ -1235,19 +1235,25 @@ object_hash_from_depfile(const char *depfile, struct hash *hash)
 // Helper function for put_file_in_cache and move_file_to_cache_same_fs.
 static void
 do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy,
-                              bool attempt_link)
+                              bool attempt_link, bool gzip)
 {
 	assert(!conf->read_only);
 	assert(!conf->read_only_direct);
 
 	struct stat orig_dest_st;
 	bool orig_dest_existed = stat(dest, &orig_dest_st) == 0;
+	const char *compression_type = conf->compression ? conf->compression_type : NULL;
 	int compression_level = conf->compression ? conf->compression_level : 0;
 	bool do_move = !copy && !conf->compression;
 	bool do_link = attempt_link && copy && conf->hard_link && !conf->compression;
 
+	if (gzip) {
+		compression_type = "gzip";
+		compression_level = -1;
+	}
+
 	if (do_move) {
-		move_uncompressed_file(source, dest, compression_level);
+		move_uncompressed_file(source, dest, compression_type, compression_level);
 	} else {
 		if (do_link) {
 			x_unlink(dest);
@@ -1263,7 +1269,7 @@ do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy,
 			}
 		}
 		if (!do_link) {
-			int ret = copy_file(source, dest, compression_level, true);
+			int ret = copy_file(source, dest, compression_type, compression_level, true);
 			if (ret != 0) {
 				cc_log("Failed to copy %s to %s: %s", source, dest, strerror(errno));
 				stats_update(STATS_ERROR);
@@ -1304,7 +1310,7 @@ do_copy_or_move_file_to_cache(const char *source, const char *dest, bool copy,
 static void
 put_file_in_cache(const char *source, const char *dest)
 {
-	do_copy_or_move_file_to_cache(source, dest, true, true);
+	do_copy_or_move_file_to_cache(source, dest, true, true, false);
 }
 
 // Copy a file to the cache.
@@ -1314,18 +1320,18 @@ put_file_in_cache(const char *source, const char *dest)
 static void
 copy_file_to_cache(const char *source, const char *dest)
 {
-	do_copy_or_move_file_to_cache(source, dest, true, false);
+	do_copy_or_move_file_to_cache(source, dest, true, false, false);
 }
 
 // Move a file into the cache.
 //
 // dest must be a path in the cache (see get_path_in_cache). source must be on
 // the same file system as dest. dest will be compressed if conf->compression
-// is true.
+// is true. Always use gzip compression.
 static void
 move_file_to_cache_same_fs(const char *source, const char *dest)
 {
-	do_copy_or_move_file_to_cache(source, dest, false, true);
+	do_copy_or_move_file_to_cache(source, dest, false, true, true);
 }
 
 #ifdef HAVE_LIBMEMCACHED
@@ -1360,12 +1366,16 @@ do_copy_or_link_file_from_cache(const char *source, const char *dest, bool copy)
 	}
 
 	int ret;
-	bool do_link = !copy && conf->hard_link && !file_is_compressed(source);
+	const char *type;
+	bool compression = file_is_compressed(source, &type);
+	bool do_link = !copy && conf->hard_link && !compression;
+
 	if (do_link) {
 		x_unlink(dest);
 		ret = link(source, dest);
 	} else {
-		ret = copy_file(source, dest, 0, false);
+		int level = 0; /* uncompressed */
+		ret = copy_file(source, dest, type, level, false);
 	}
 
 	if (ret == -1) {
@@ -4888,6 +4898,7 @@ static int
 ccache_main_options(int argc, char *argv[])
 {
 	enum longopts {
+		COPY_FILE,
 		DUMP_MANIFEST,
 		HASH_FILE,
 		PRINT_STATS,
@@ -4895,6 +4906,7 @@ ccache_main_options(int argc, char *argv[])
 	static const struct option options[] = {
 		{"cleanup",       no_argument,       0, 'c'},
 		{"clear",         no_argument,       0, 'C'},
+		{"copy-file",     no_argument,       0, COPY_FILE},
 		{"dump-manifest", required_argument, 0, DUMP_MANIFEST},
 		{"get-config",    required_argument, 0, 'k'},
 		{"hash-file",     required_argument, 0, HASH_FILE},
@@ -4914,6 +4926,16 @@ ccache_main_options(int argc, char *argv[])
 	while ((c = getopt_long(argc, argv, "cCk:hF:M:po:sVz", options, NULL))
 	       != -1) {
 		switch (c) {
+		case COPY_FILE:
+			initialize();
+			if (argc > 2) {
+				copy_file(argv[optind], argv[optind+1],
+				          conf->compression_type,
+				          conf->compression ? conf->compression_level : 0,
+                                          false);
+			}
+			break;
+
 		case DUMP_MANIFEST:
 			initialize();
 			manifest_dump(optarg, stdout);

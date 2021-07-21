@@ -87,6 +87,29 @@ confitem_format_double(const void *value)
 }
 
 bool
+confitem_parse_int(const char *str, void *result, char **errmsg)
+{
+	int *value = (int *)result;
+	errno = 0;
+	char *endptr;
+	long x = strtol(str, &endptr, 10);
+	if (errno == 0 && *str != '\0' && *endptr == '\0') {
+		*value = x;
+		return true;
+	} else {
+		*errmsg = format("invalid integer: \"%s\"", str);
+		return false;
+	}
+}
+
+char *
+confitem_format_int(const void *value)
+{
+	const int *i = (const int *)value;
+	return format("%d", *i);
+}
+
+bool
 confitem_parse_size(const char *str, void *result, char **errmsg)
 {
 	uint64_t *value = (uint64_t *)result;

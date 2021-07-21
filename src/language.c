@@ -145,6 +145,9 @@ language_is_supported(const char *language)
 bool
 language_is_preprocessed(const char *language)
 {
+	if (!language) {
+		return false;
+	}
 	const char *p_language = p_language_for_language(language);
 	assert(p_language);
 	return str_eq(language, p_language);

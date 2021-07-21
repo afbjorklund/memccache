@@ -18,7 +18,7 @@
 #include "framework.h"
 #include "util.h"
 
-#define N_CONFIG_ITEMS 37
+#define N_CONFIG_ITEMS 38
 static struct {
 	char *descr;
 	char *origin;
@@ -56,7 +56,8 @@ TEST(conf_create)
 	CHECK_STR_EQ("", conf->compiler);
 	CHECK_STR_EQ("mtime", conf->compiler_check);
 	CHECK(!conf->compression);
-	CHECK_INT_EQ(6, conf->compression_level);
+	CHECK_INT_EQ(-1, conf->compression_level);
+	CHECK_STR_EQ("gzip", conf->compression_type);
 	CHECK_STR_EQ("", conf->couchbase_conf);
 	CHECK_STR_EQ("", conf->cpp_extension);
 	CHECK(!conf->debug);
@@ -114,6 +115,7 @@ TEST(conf_read_valid_config)
 		"compiler_check = none\n"
 		"compression=true\n"
 		"compression_level= 2\n"
+	        "compression_type = gzip\n"
 	        "couchbase_conf=cb\n"
 		"cpp_extension = .foo\n"
 		"depend_mode = true\n"
@@ -157,6 +159,7 @@ TEST(conf_read_valid_config)
 	CHECK_STR_EQ("none", conf->compiler_check);
 	CHECK(conf->compression);
 	CHECK_INT_EQ(2, conf->compression_level);
+	CHECK_STR_EQ("gzip", conf->compression_type);
 	CHECK_STR_EQ("cb", conf->couchbase_conf);
 	CHECK_STR_EQ(".foo", conf->cpp_extension);
 	CHECK(conf->depend_mode);
@@ -479,6 +482,7 @@ TEST(conf_print_items)
 		"cc",
 		true,
 		8,
+		"gzip",
 		"cb",
 		"ce",
 		false,
@@ -534,6 +538,7 @@ TEST(conf_print_items)
 	CHECK_STR_EQ("compiler_check = cc", received_conf_items[n++].descr);
 	CHECK_STR_EQ("compression = true", received_conf_items[n++].descr);
 	CHECK_STR_EQ("compression_level = 8", received_conf_items[n++].descr);
+	CHECK_STR_EQ("compression_type = gzip", received_conf_items[n++].descr);
 	CHECK_STR_EQ("couchbase_conf = cb", received_conf_items[n++].descr);
 	CHECK_STR_EQ("cpp_extension = ce", received_conf_items[n++].descr);
 	CHECK_STR_EQ("debug = false", received_conf_items[n++].descr);
